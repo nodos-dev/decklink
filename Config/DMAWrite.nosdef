@@ -1,0 +1,57 @@
+{
+    "nodes": [
+        {
+            "class_name": "DMAWrite",
+            "display_name": "DeckLink DMA Write",
+            "contents_type": "Job",
+            "description": "Sends YCbCr frames to the specified channel",
+            "pins": [
+                {
+                    "name": "Run",
+                    "type_name": "nos.exe",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_ONLY"
+                },
+                {
+                    "name": "FieldType",
+                    "display_name": "Field Type",
+                    "type_name": "nos.sys.vulkan.FieldType",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_OR_PROPERTY",
+                    "data": "PROGRESSIVE"
+                },
+                {
+                    "name": "Channel",
+                    "type_name": "nos.fb.Void",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_ONLY"
+                },
+                {
+                    "name": "CurrentVBL",
+                    "type_name": "uint",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_ONLY"
+                },
+                {
+                    "name": "Input",
+                    "type_name": "nos.sys.vulkan.Buffer",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_ONLY"
+                }
+            ],
+            "functions": [
+                {
+                    "class_name": "Drop",
+                    "contents_type": "Job",
+                    "pins": [
+                        {
+                            "name": "Propagate",
+                            "type_name": "nos.exe",
+                            "show_as": "OUTPUT_PIN"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
