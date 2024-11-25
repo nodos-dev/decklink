@@ -32,7 +32,7 @@ struct DeckLinkPluginFunctions : nos::PluginFunctions
 {
 	DeckLinkPluginFunctions()
 	{
-		DeckLinkDevice::InitializeDeviceList();
+		SubDevice::InitializeSubDeviceList();
 	}
 
 	nosResult ExportNodeFunctions(size_t& outSize, nosNodeFunctions** outList) override
@@ -50,7 +50,7 @@ struct DeckLinkPluginFunctions : nos::PluginFunctions
 
 	nosResult OnPreUnloadPlugin() override
 	{
-		DeckLinkDevice::ClearDeviceList();
+		SubDevice::ClearSubDeviceList();
 		return NOS_RESULT_SUCCESS;
 	}
 };

@@ -5,24 +5,29 @@
 
 #include "Device/DeckLinkDevice.hpp"
 
+#include <nosUtil/Stopwatch.hpp>
+
 namespace nos::decklink
 {
-
+	
 struct DMAWriteNodeContext : NodeContext
 {
 	DMAWriteNodeContext(const nosFbNode* node) : NodeContext(node)
 	{
+		Device = SubDevice::GetDevice(0);
+		if (!Device->OpenOutput(bmdModeHD1080p5994, bmdFormat8BitYUV))
+			nosEngine.LogE("Unable to open output for device: %s", Device->ModelName.c_str());
 	}
 
 	void GetScheduleInfo(nosScheduleInfo* out) override
 	{
 		*out = nosScheduleInfo{
 			.Importance = 1,
-			.DeltaSeconds = {0, 0},
+			.DeltaSeconds = Device->GetDeltaSeconds(),
 			.Type = NOS_SCHEDULE_TYPE_ON_DEMAND,
 		};
 	}
-	
+
 	nosResult ExecuteNode(nosNodeExecuteParams* params) override
 	{
 		nosResourceShareInfo inputBuffer{};
@@ -42,11 +47,14 @@ struct DMAWriteNodeContext : NodeContext
 		if (!inputBuffer.Memory.Handle)
 			return NOS_RESULT_FAILED;
 
-		auto buffer = nosVulkan->Map(&inputBuffer);
-		auto inputSize = inputBuffer.Memory.Size;
+		auto buffer = nosVulkan->Map(&inputBuffer); {
+			util::Stopwatch sw;
+			Device->WaitFrameCompletion();
+			nosEngine.WatchLog(("DeckLink " + Device->Handle + " Wait Time").c_str(), sw.ElapsedString().c_str());
+		}
+		Device->DmaWrite(buffer, inputBuffer.Info.Buffer.Size);
+		Device->ScheduleNextFrame();
 
-		// TODO.
-		
 		nosScheduleNodeParams schedule {
 			.NodeId = NodeId,
 			.AddScheduleCount = 1
@@ -61,6 +69,8 @@ struct DMAWriteNodeContext : NodeContext
 		nosScheduleNodeParams schedule{.NodeId = NodeId, .AddScheduleCount = 1};
 		nosEngine.ScheduleNode(&schedule);
 	}
+
+	SubDevice* Device = nullptr;
 };
 
 nosResult RegisterDMAWriteNode(nosNodeFunctions* functions)
