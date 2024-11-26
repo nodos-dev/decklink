@@ -5,6 +5,8 @@
 #include <Nodos/Modules.h>
 #include <nosUtil/Stopwatch.hpp>
 
+#include "ChannelMapping.inl"
+
 #if _WIN32
 #define dlbool_t	BOOL
 #define dlstring_t	BSTR
@@ -119,23 +121,6 @@ HRESULT GetDeckLinkIterator(IDeckLinkIterator **deckLinkIterator)
 	return result;
 }
 
-std::string_view ChannelToString(Channel channel)
-{
-	switch (channel)
-	{
-	case Channel::SingleLink1: return "SingleLink 1";
-	case Channel::SingleLink2: return "SingleLink 2";
-	case Channel::SingleLink3: return "SingleLink 3";
-	case Channel::SingleLink4: return "SingleLink 4";
-	case Channel::SingleLink5: return "SingleLink 5";
-	case Channel::SingleLink6: return "SingleLink 6";
-	case Channel::SingleLink7: return "SingleLink 7";
-	case Channel::SingleLink8: return "SingleLink 8";
-	default:
-		return "";
-	}
-}
-
 SubDevice::SubDevice(IDeckLink* deviceInterface)
 	: Device(deviceInterface)
 {
@@ -219,6 +204,11 @@ SubDevice::~SubDevice()
 		Release(frame);
 }
 
+bool SubDevice::CanDoMode(nosDeckLinkMode mode)
+{
+	return !ActiveModes[mode];
+}
+
 bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 {
 	if (!Output) 
@@ -233,6 +223,8 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 		nosEngine.LogE("DeckLinkDevice: Failed to enable video output for device: %s", ModelName.c_str());
 		return false;
 	}
+
+	ActiveModes[NOS_DECK_LINK_MODE_OUTPUT] = true;
 
 	for (auto& frame : VideoFrames)
 		Release(frame);
@@ -420,9 +412,63 @@ std::string Device::GetUniqueDisplayName() const
 	return ModelName + " - " + std::to_string(Index);
 }
 
-//std::vector<std::string> Device::GetAvailableChannelNames(bool input)
-//{
-//	return {};
-//
-//}
+std::vector<nosDeckLinkChannel> Device::GetAvailableChannels(nosDeckLinkMode mode)
+{
+	std::vector<nosDeckLinkChannel> channels;
+	static std::array allChannels {
+		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_1,
+		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_2,
+		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_3,
+		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_4,
+		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_5,
+		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_6,
+		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_7,
+		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_8
+	};
+	for (auto& channel : allChannels)
+	{
+		if (CanOpenChannel(mode, channel))
+			channels.push_back(channel);
+	}
+	return channels;
+}
+
+bool Device::CanOpenChannel(nosDeckLinkMode mode, nosDeckLinkChannel channel) const
+{
+	// Determine which sub-devices are capable of opening the channel
+	for (auto& [modelName, rest] : GetChannelMap())
+	{
+		if (modelName != ModelName)
+			continue;
+		for (auto& [profile, rest2] : rest)
+		{
+			if (profile != bmdProfileFourSubDevicesHalfDuplex)
+				continue;
+			for (auto& [subDeviceIndex, rest3] : rest2)
+			{
+				for (auto& [curChannel, modes] : rest3)
+				{
+					if (curChannel == channel && modes.contains(mode))
+					{
+						if (auto subDevice = GetSubDevice(subDeviceIndex))
+						{
+							if (subDevice->CanDoMode(mode))
+								return true;
+						}
+						return true;
+					}
+				}
+			}
+		}
+	}
+	
+	return false;
+}
+
+SubDevice* Device::GetSubDevice(int64_t index) const
+{
+	if (index < SubDevices.size())
+		return SubDevices[index].get();
+	return nullptr;
+}
 }

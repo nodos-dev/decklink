@@ -15,29 +15,18 @@
 // Nodos
 #include <Nodos/Types.h>
 
+#include "nosDeckLinkDevice/nosDeckLinkDevice.h"
+
 namespace nos::decklink
 {
 
-enum class Channel
-{
-	SingleLink1,
-	SingleLink2,
-	SingleLink3,
-	SingleLink4,
-	SingleLink5,
-	SingleLink6,
-	SingleLink7,
-	SingleLink8,
-};
-
-std::string_view ChannelToString(Channel channel);
-	
 class SubDevice
 {
 public:
 	friend class OutputCallback;
 	SubDevice(IDeckLink* deviceInterface);
 	~SubDevice();
+	bool CanDoMode(nosDeckLinkMode mode);
 
 	std::string ModelName;
 	int64_t SubDeviceIndex = -1;
@@ -72,6 +61,8 @@ protected:
 
 	uint32_t TotalFramesScheduled = 0;
 	uint32_t NextFrameToSchedule = 0;
+
+	std::unordered_map<nosDeckLinkMode, bool> ActiveModes;
 };
 
 class Device
@@ -86,7 +77,11 @@ public:
 
 	std::string GetUniqueDisplayName() const;
 
-	//std::vector<Channel> GetAvailableChannels(bool input);
+	std::vector<nosDeckLinkChannel> GetAvailableChannels(nosDeckLinkMode mode);
+
+	bool CanOpenChannel(nosDeckLinkMode mode, nosDeckLinkChannel channel) const;
+
+	SubDevice* GetSubDevice(int64_t index) const;
 
 	uint32_t Index = -1;
 	int64_t GroupId = -1;

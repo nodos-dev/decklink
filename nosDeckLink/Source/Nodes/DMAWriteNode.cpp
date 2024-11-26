@@ -4,8 +4,6 @@
 #include <nosVulkanSubsystem/nosVulkanSubsystem.h>
 #include <nosVulkanSubsystem/Helpers.hpp>
 
-#include "Device/DeckLinkDevice.hpp"
-
 #include <nosUtil/Stopwatch.hpp>
 
 namespace nos::decklink
@@ -21,7 +19,7 @@ struct DMAWriteNode : NodeContext
 	{
 		*out = nosScheduleInfo{
 			.Importance = 1,
-			.DeltaSeconds = Device ? Device->GetDeltaSeconds() : nosVec2u{0, 0},
+			.DeltaSeconds = /*Device ? Device->GetDeltaSeconds() : */nosVec2u{0, 0},
 			.Type = NOS_SCHEDULE_TYPE_ON_DEMAND,
 		};
 	}
@@ -32,8 +30,6 @@ struct DMAWriteNode : NodeContext
 
 	nosResult ExecuteNode(nosNodeExecuteParams* params) override
 	{
-		if (!Device)
-			return NOS_RESULT_FAILED;
 		nosResourceShareInfo inputBuffer{};
 		auto fieldType = nos::sys::vulkan::FieldType::UNKNOWN;
 		for (size_t i = 0; i < params->PinCount; ++i)
@@ -49,8 +45,8 @@ struct DMAWriteNode : NodeContext
 			return NOS_RESULT_FAILED;
 
 		auto buffer = nosVulkan->Map(&inputBuffer);
-		Device->DmaWrite(buffer, inputBuffer.Info.Buffer.Size);
-		Device->ScheduleNextFrame();
+		/*Device->DmaWrite(buffer, inputBuffer.Info.Buffer.Size);
+		Device->ScheduleNextFrame();*/
 
 		nosScheduleNodeParams schedule {
 			.NodeId = NodeId,
@@ -66,8 +62,6 @@ struct DMAWriteNode : NodeContext
 		nosScheduleNodeParams schedule{.NodeId = NodeId, .AddScheduleCount = 1};
 		nosEngine.ScheduleNode(&schedule);
 	}
-
-	SubDevice* Device = nullptr;
 };
 
 nosResult RegisterDMAWriteNode(nosNodeFunctions* functions)

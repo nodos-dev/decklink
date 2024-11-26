@@ -1,8 +1,6 @@
 // Copyright MediaZ Teknoloji A.S. All Rights Reserved.
 #include <Nodos/PluginHelpers.hpp>
 
-#include "Device/DeckLinkDevice.hpp"
-
 #include <nosUtil/Stopwatch.hpp>
 
 namespace nos::decklink
@@ -18,16 +16,16 @@ struct WaitFrameNode : NodeContext
 	{
 		{
 			util::Stopwatch sw;
-			Device->WaitFrameCompletion();
-			nosEngine.WatchLog(("DeckLink " + Device->Handle + " Wait Time").c_str(), sw.ElapsedString().c_str());
+			//Device->WaitFrameCompletion();
+			// nosEngine.WatchLog(("DeckLink " + Device->Handle + " Wait Time").c_str(), sw.ElapsedString().c_str());
 		}
 
-		nosEngine.SetPinValue(GetPin(NOS_NAME("SubDeviceHandle"))->Id,  nos::Buffer(Device->Handle.c_str(), Device->Handle.size() + 1));
+		// nosEngine.SetPinValue(GetPin(NOS_NAME("SubDeviceHandle"))->Id,  nos::Buffer(Device->Handle.c_str(), Device->Handle.size() + 1));
 		
 		return NOS_RESULT_SUCCESS;
 	}
 
-	SubDevice* Device = nullptr;
+	// SubDevice* Device = nullptr;
 };
 
 nosResult RegisterWaitFrameNode(nosNodeFunctions* functions)

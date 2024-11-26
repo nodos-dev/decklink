@@ -44,7 +44,7 @@ public:
 
 		});
 		AddPinValueWatcher(NSN_Device, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
-			
+
 		});
 		AddPinValueWatcher(NSN_ChannelName, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			
@@ -196,18 +196,19 @@ public:
 	std::vector<std::string> GetPossibleDeviceNames()
     {
     	std::vector<std::string> devices = {"NONE"};
-    	for (auto& device : Device::GetDevices())
-    	{
-    		devices.push_back(device->GetUniqueDisplayName());
-    	}
-    	return devices;
-    }
-	
+		size_t count = 0;
+		nosDeckLink->GetDevices(&count, nullptr);
+		std::vector<nosDeckLinkDeviceDesc> deviceDescs(count);
+		nosDeckLink->GetDevices(&count, deviceDescs.data());
+		for (auto& deviceDesc : deviceDescs)
+		{
+			devices.push_back(deviceDesc.UniqueDisplayName);
+		}
+		return devices;
+	}
 	std::vector<std::string> GetPossibleChannelNames() 
 	{
 		std::vector<std::string> channels = {"NONE"};
-		if (!Device)
-			return channels;
 		return channels;
 	}
 	
@@ -239,7 +240,6 @@ public:
 	std::string InterlacedPinValue = "NONE";
 	std::string ReferenceSourcePinValue = "NONE";
 
-	Device* Device{};
 	enum class InterlacedState
 	{
 		NONE,
