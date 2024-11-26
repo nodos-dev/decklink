@@ -1,0 +1,68 @@
+{
+    "nodes": [
+        {
+            "class_name": "WaitFrame",
+            "display_name": "DeckLink Wait Frame",
+            "contents_type": "Job",
+            "description": "",
+            "pins": [
+                {
+                    "name": "Thread",
+                    "type_name": "nos.exe",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_ONLY"
+                },
+                {
+                    "name": "FrameAvailable",
+                    "display_name": "Frame Available",
+                    "type_name": "nos.exe",
+                    "show_as": "OUTPUT_PIN",
+                    "can_show_as": "OUTPUT_PIN_ONLY"
+                },
+                {
+                    "name": "WaitField",
+                    "display_name": "Wait Field",
+                    "type_name": "nos.sys.vulkan.FieldType",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_OR_PROPERTY",
+                    "data": "PROGRESSIVE",
+                    "description": "Field to wait the frame buffer on. If set to UNKNOWN, it will keep track of fields to wait on its own. If signal is progressive, this property is ignored."
+                },
+                {
+                    "name": "FieldType",
+                    "display_name": "Field Type",
+                    "type_name": "nos.sys.vulkan.FieldType",
+                    "show_as": "OUTPUT_PIN",
+                    "can_show_as": "OUTPUT_PIN_OR_PROPERTY",
+                    "data": "UNKNOWN",
+                    "description": "Which field this wait belongs to",
+                    "readonly": true
+                }
+            ],
+            "functions": [
+                {
+                    "class_name": "WaitFailed",
+                    "contents_type": "Job",
+                    "pins": [
+                        {
+                            "name": "Propagate",
+                            "type_name": "nos.exe",
+                            "show_as": "OUTPUT_PIN"
+                        }
+                    ]
+                },
+                {
+                    "class_name": "Drop",
+                    "contents_type": "Job",
+                    "pins": [
+                        {
+                            "name": "Trigger",
+                            "type_name": "nos.exe",
+                            "show_as": "INPUT_PIN"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

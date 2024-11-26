@@ -1,0 +1,92 @@
+{
+    "nodes": [
+        {
+            "class_name": "Channel",
+            "display_name": "DeckLink Channel",
+            "contents_type": "Job",
+            "description": "Configures device and opens a channel",
+            "pins": [
+                {
+                    "name": "Thread",
+                    "type_name": "nos.exe",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_ONLY"
+                },
+                {
+                    "name": "Continue",
+                    "type_name": "nos.exe",
+                    "show_as": "OUTPUT_PIN",
+                    "can_show_as": "OUTPUT_PIN_ONLY"
+                },
+                {
+                    "name": "Channel",
+                    "type_name": "nos.decklink.ChannelInfo",
+                    "show_as": "OUTPUT_PIN",
+                    "can_show_as": "OUTPUT_PIN_OR_PROPERTY"
+                },
+                {
+                    "name": "IsOpen",
+                    "type_name": "bool",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY"
+                },
+                {
+                    "name": "IsInput",
+                    "type_name": "bool",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY"
+                },
+                {
+                    "name": "Profile",
+                    "type_name": "string",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY",
+                    "readonly": true
+                },
+                {
+                    "name": "Device",
+                    "type_name": "string",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY",
+                    "visualizer": {
+                        "type": "COMBO_BOX",
+                        "name": "decklink.DeviceStringList"
+                    }
+                },
+                {
+                    "name": "ChannelName",
+                    "type_name": "string",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY"
+                },
+                {
+                    "name": "Resolution",
+                    "type_name": "string",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY"
+                },
+                {
+                    "name": "FrameRate",
+                    "type_name": "string",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY"
+                },
+                {
+                    "name": "IsInterlaced",
+                    "type_name": "string",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY"
+                },
+                {
+                    "name": "FrameBufferFormat",
+                    "display_name": "Frame Buffer Format",
+                    "type_name": "nos.mediaio.YCbCrPixelFormat",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY"
+                }
+            ],
+            "functions": [
+            ]
+        }
+    ]
+}

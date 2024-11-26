@@ -3,8 +3,6 @@
 #include <Nodos/PluginHelpers.hpp>
 #include <nosVulkanSubsystem/nosVulkanSubsystem.h>
 
-#include "Device/DeckLinkDevice.hpp"
-
 NOS_INIT_WITH_MIN_REQUIRED_MINOR(0)
 NOS_VULKAN_INIT()
 
@@ -18,23 +16,19 @@ enum class Nodes : int
 {
 	DMAWrite,
 	// DMARead,
-	// WaitVBL,
-	// Channel,
+	WaitFrame,
+	Channel,
 	Count
 };
 
 nosResult RegisterDMAWriteNode(nosNodeFunctions*);
 nosResult RegisterDMAReadNode(nosNodeFunctions*);
-nosResult RegisterWaitVBLNode(nosNodeFunctions*);
+nosResult RegisterWaitFrameNode(nosNodeFunctions*);
 nosResult RegisterChannelNode(nosNodeFunctions*);
 
 struct DeckLinkPluginFunctions : nos::PluginFunctions
 {
-	DeckLinkPluginFunctions()
-	{
-		SubDevice::InitializeSubDeviceList();
-	}
-
+	using PluginFunctions::PluginFunctions;
 	nosResult ExportNodeFunctions(size_t& outSize, nosNodeFunctions** outList) override
 	{
 		outSize = static_cast<size_t>(Nodes::Count);
@@ -42,15 +36,9 @@ struct DeckLinkPluginFunctions : nos::PluginFunctions
 			return NOS_RESULT_SUCCESS;
 
 		NOS_RETURN_ON_FAILURE(RegisterDMAWriteNode(outList[(int)Nodes::DMAWrite]))
-		// NOS_RETURN_ON_FAILURE(RegisterWaitVBLNode(outList[(int)Nodes::WaitVBL]))
-		// NOS_RETURN_ON_FAILURE(RegisterChannelNode(outList[(int)Nodes::Channel]))
+		NOS_RETURN_ON_FAILURE(RegisterWaitFrameNode(outList[(int)Nodes::WaitFrame]))
+		NOS_RETURN_ON_FAILURE(RegisterChannelNode(outList[(int)Nodes::Channel]))
 		// NOS_RETURN_ON_FAILURE(RegisterDMAReadNode(outList[(int)Nodes::DMARead]))
-		return NOS_RESULT_SUCCESS;
-	}
-
-	nosResult OnPreUnloadPlugin() override
-	{
-		SubDevice::ClearSubDeviceList();
 		return NOS_RESULT_SUCCESS;
 	}
 };

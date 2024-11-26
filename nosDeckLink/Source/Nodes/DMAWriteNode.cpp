@@ -11,29 +11,31 @@
 namespace nos::decklink
 {
 	
-struct DMAWriteNodeContext : NodeContext
+struct DMAWriteNode : NodeContext
 {
-	DMAWriteNodeContext(const nosFbNode* node) : NodeContext(node)
+	DMAWriteNode(const nosFbNode* node) : NodeContext(node)
 	{
-		Device = SubDevice::GetDevice(0);
-		if (!Device->OpenOutput(bmdModeHD1080p5994, bmdFormat8BitYUV))
-			nosEngine.LogE("Unable to open output for device: %s", Device->ModelName.c_str());
 	}
 
 	void GetScheduleInfo(nosScheduleInfo* out) override
 	{
 		*out = nosScheduleInfo{
 			.Importance = 1,
-			.DeltaSeconds = Device->GetDeltaSeconds(),
+			.DeltaSeconds = Device ? Device->GetDeltaSeconds() : nosVec2u{0, 0},
 			.Type = NOS_SCHEDULE_TYPE_ON_DEMAND,
 		};
 	}
 
+	void OnPinValueChanged(nos::Name pinName, nosUUID pinId, nosBuffer value) override
+	{
+	}
+
 	nosResult ExecuteNode(nosNodeExecuteParams* params) override
 	{
+		if (!Device)
+			return NOS_RESULT_FAILED;
 		nosResourceShareInfo inputBuffer{};
 		auto fieldType = nos::sys::vulkan::FieldType::UNKNOWN;
-		uint32_t curVBLCount = 0;
 		for (size_t i = 0; i < params->PinCount; ++i)
 		{
 			auto& pin = params->Pins[i];
@@ -41,18 +43,12 @@ struct DMAWriteNodeContext : NodeContext
 				inputBuffer = vkss::ConvertToResourceInfo(*InterpretPinValue<sys::vulkan::Buffer>(*pin.Data));
 			if (pin.Name == NOS_NAME("FieldType"))
 				fieldType = *InterpretPinValue<sys::vulkan::FieldType>(*pin.Data);
-			if (pin.Name == NOS_NAME("CurrentVBL"))
-				curVBLCount = *InterpretPinValue<uint32_t>(*pin.Data);
 		}
 
 		if (!inputBuffer.Memory.Handle)
 			return NOS_RESULT_FAILED;
 
-		auto buffer = nosVulkan->Map(&inputBuffer); {
-			util::Stopwatch sw;
-			Device->WaitFrameCompletion();
-			nosEngine.WatchLog(("DeckLink " + Device->Handle + " Wait Time").c_str(), sw.ElapsedString().c_str());
-		}
+		auto buffer = nosVulkan->Map(&inputBuffer);
 		Device->DmaWrite(buffer, inputBuffer.Info.Buffer.Size);
 		Device->ScheduleNextFrame();
 
@@ -76,7 +72,7 @@ struct DMAWriteNodeContext : NodeContext
 
 nosResult RegisterDMAWriteNode(nosNodeFunctions* functions)
 {
-	NOS_BIND_NODE_CLASS(NOS_NAME_STATIC("DMAWrite"), DMAWriteNodeContext, functions)
+	NOS_BIND_NODE_CLASS(NOS_NAME_STATIC("DMAWrite"), DMAWriteNode, functions)
 	return NOS_RESULT_SUCCESS;
 }
 }

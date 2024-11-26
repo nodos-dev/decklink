@@ -8,6 +8,10 @@
         "description": "Video I/O plugin for BlackMagic DeckLink cards.",
         "dependencies": [
             {
+                "name": "nos.device.decklink",
+                "version": "1.0.0"
+            },
+            {
                 "name": "nos.sys.vulkan",
                 "version": "5.8.0"
             },
@@ -31,17 +35,29 @@
         "category": "Media I/O"
     },
     "node_definitions": [
-        "Config/DMAWrite.nosdef"
+      "Config/DMAWrite.nosdef",
+      "Config/WaitFrame.nosdef",
+      "Config/Channel.nosdef"
     ],
     "custom_types" :[
     ],
     "binary_path": "Binaries/nosDeckLink",
     "associated_nodes": [
-        {
-            "category": "Device|DeckLink",
-            "class_name": "DMAWrite",
-            "display_name": "DMA Write"
-        }
+      {
+        "category": "Device|DeckLink",
+        "class_name": "DMAWrite",
+        "display_name": "DMA Write"
+      },
+      {
+        "category": "Device|DeckLink",
+        "class_name": "WaitFrame",
+        "display_name": "Wait Frame"
+      },
+      {
+        "category": "Device|DeckLink",
+        "class_name": "Channel",
+        "display_name": "Channel"
+      }
     ],
     "third_party_software": []
 }

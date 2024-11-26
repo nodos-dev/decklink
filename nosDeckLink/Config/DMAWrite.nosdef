@@ -21,16 +21,11 @@
                     "data": "PROGRESSIVE"
                 },
                 {
-                    "name": "Channel",
-                    "type_name": "nos.fb.Void",
+                    "name": "SubDeviceHandle",
+                    "type_name": "string",
                     "show_as": "INPUT_PIN",
-                    "can_show_as": "INPUT_PIN_ONLY"
-                },
-                {
-                    "name": "CurrentVBL",
-                    "type_name": "uint",
-                    "show_as": "INPUT_PIN",
-                    "can_show_as": "INPUT_PIN_ONLY"
+                    "can_show_as": "INPUT_PIN_ONLY",
+                    "data": ""
                 },
                 {
                     "name": "Input",

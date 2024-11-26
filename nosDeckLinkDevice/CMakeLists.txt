@@ -57,36 +57,22 @@ if (WIN32)
 
     set_source_files_properties(${MIDL_OUTPUT} PROPERTIES GENERATED TRUE)
 
-    add_custom_target(MIDL_Target DEPENDS ${MIDL_OUTPUT})
+    add_custom_target(DeckLinkMIDL DEPENDS ${MIDL_OUTPUT})
 endif()
 
-
-# nos.sys.vulkan
-nos_get_module("nos.sys.vulkan" "5.8" NOS_SYS_VULKAN_TARGET_5_8)
-
-# nos.mediaio
-nos_get_module("nos.mediaio" "2.0" NOS_MEDIAIO_TARGET)
-nos_find_module_path("nos.mediaio" "2.0" NOS_MEDIAIO_PATH)
-nos_generate_flatbuffers("${NOS_MEDIAIO_PATH}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Source/Generated" "cpp" "${NOS_MEDIAIO_PATH};${NOS_SDK_DIR}/types" generated_nosDeckLink_dep_nosMediaIO)
-
-# nos.utilities
-nos_get_module("nos.utilities" "2.9" NOS_UTILITIES_TARGET)
-nos_find_module_path("nos.utilities" "2.9" NOS_UTILITIES_PATH)
-nos_generate_flatbuffers("${NOS_UTILITIES_PATH}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Source/Generated" "cpp" "${NOS_UTILITIES_PATH};${NOS_SDK_DIR}/types" generated_nosDeckLink_dep_nosUtilities)
-
-list(APPEND DEPENDENCIES generated_nosDeckLink_dep_nosMediaIO generated_nosDeckLink_dep_nosUtilities ${NOS_SYS_VULKAN_TARGET_5_8} ${NOS_PLUGIN_SDK_TARGET})
+list(APPEND DEPENDENCIES ${NOS_PLUGIN_SDK_TARGET})
+if (WIN32)
+    list(APPEND DEPENDENCIES DeckLinkMIDL)
+endif()
 list(APPEND INCLUDE_FOLDERS
     ${EXTERNAL_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include
     ${CMAKE_CURRENT_BINARY_DIR})
 
-nos_add_plugin("nosDeckLink" "${DEPENDENCIES}" "${INCLUDE_FOLDERS}")
+nos_add_subsystem("nosDeckLinkDevice" "${DEPENDENCIES}" "${INCLUDE_FOLDERS}")
 
-target_sources(nosDeckLink PRIVATE ${PLATFORM_SOURCES})
-
-if (WIN32)
-    add_dependencies(nosDeckLink MIDL_Target)
-endif()
+target_sources(nosDeckLinkDevice PRIVATE ${PLATFORM_SOURCES})
 
 # Project generation
-nos_group_targets("nosDeckLink" "NOS Plugins")
+nos_group_targets("nosDeckLinkDevice" "NOS Subsystems")
