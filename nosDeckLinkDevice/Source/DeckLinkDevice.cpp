@@ -6,6 +6,7 @@
 #include <nosUtil/Stopwatch.hpp>
 
 #include "ChannelMapping.inl"
+#include "EnumConversions.hpp"
 
 #if _WIN32
 #define dlbool_t	BOOL
@@ -35,17 +36,76 @@ const std::function<dlstring_t(std::string)> StdToDlString = [](std::string std_
 namespace nos::decklink
 {
 
-class OutputCallback : public IDeckLinkVideoOutputCallback
+HRESULT GetDeckLinkIterator(IDeckLinkIterator **deckLinkIterator)
+{
+	HRESULT result = S_OK;
+
+	// Create an IDeckLinkIterator object to enumerate all DeckLink cards in the system
+	result = CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)deckLinkIterator);
+	if (FAILED(result))
+		nosEngine.LogE("A DeckLink iterator could not be created. The DeckLink drivers may not be installed.");
+
+	return result;
+}
+
+std::vector<std::unique_ptr<Device>> InitializeDevices()
+{
+	IDeckLinkIterator* deckLinkIterator = nullptr;
+
+	HRESULT result = E_FAIL;
+#ifdef _WIN32
+	result = CoInitialize(NULL);
+	if (FAILED(result))
+	{
+		nosEngine.LogE("DeckLinkDevice: Initialization of COM failed with error: %s", _com_error(result).ErrorMessage());
+		return {};
+	}
+#endif
+
+	result = GetDeckLinkIterator(&deckLinkIterator);
+	if (FAILED(result))
+	{
+		return {};
+	}
+
+	IDeckLink* deckLink = NULL;
+	uint32_t   deviceNumber = 0;
+
+	// Obtain an IDeckLink instance for each device on the system
+	std::vector<std::unique_ptr<SubDevice>> subDevices;
+	while (deckLinkIterator->Next(&deckLink) == S_OK)
+	{
+		auto bmDevice = std::make_unique<SubDevice>(deckLink);
+		subDevices.push_back(std::move(bmDevice));
+		deviceNumber++;
+	}
+
+	if (deckLinkIterator)
+		deckLinkIterator->Release();
+
+	std::unordered_map<int64_t, std::vector<std::unique_ptr<SubDevice>>> subDevicePerDevice;
+	for (auto& subDevice : subDevices)
+		subDevicePerDevice[subDevice->DeviceGroupId].push_back(std::move(subDevice));
+
+	std::vector<std::unique_ptr<Device>> devices;
+	uint32_t deviceIndex = 0;
+	for (auto& [groupId, subDevices] : subDevicePerDevice)
+	{
+		devices.push_back(std::make_unique<Device>(deviceIndex, std::move(subDevices)));
+		++deviceIndex;
+	}
+
+	return devices;
+}
+
+template <typename T>
+class Object : public T
 {
 public:
-	OutputCallback(SubDevice* deckLinkDevice) :
-		Device(deckLinkDevice),
+	Object() :
 		RefCount(1)
 	{
 	}
-
-	HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result) override;
-	HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void) override;
 
 	// IUnknown needs only a dummy implementation
 	HRESULT	STDMETHODCALLTYPE QueryInterface(REFIID iid, LPVOID *ppv) override
@@ -69,8 +129,28 @@ public:
 	}
 
 private:
-	SubDevice*  Device;
 	std::atomic<int32_t> RefCount;
+};
+	
+class OutputCallback : public Object<IDeckLinkVideoOutputCallback>
+{
+public:
+	OutputCallback(SubDevice* deckLinkDevice) :
+		Device(deckLinkDevice)
+	{
+	}
+
+	HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result) override;
+	HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void) override;
+
+	// IUnknown needs only a dummy implementation
+	HRESULT	STDMETHODCALLTYPE QueryInterface(REFIID iid, LPVOID *ppv) override
+	{
+		return E_NOINTERFACE;
+	}
+
+private:
+	SubDevice*  Device;
 };
 	
 HRESULT	OutputCallback::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result)
@@ -107,18 +187,6 @@ void Release(T& obj)
 		obj->Release();
 		obj = nullptr;
 	}
-}
-	
-HRESULT GetDeckLinkIterator(IDeckLinkIterator **deckLinkIterator)
-{
-	HRESULT result = S_OK;
-
-	// Create an IDeckLinkIterator object to enumerate all DeckLink cards in the system
-	result = CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)deckLinkIterator);
-	if (FAILED(result))
-		nosEngine.LogE("A DeckLink iterator could not be created. The DeckLink drivers may not be installed.");
-
-	return result;
 }
 
 SubDevice::SubDevice(IDeckLink* deviceInterface)
@@ -179,18 +247,6 @@ SubDevice::SubDevice(IDeckLink* deviceInterface)
 		nosEngine.LogE("DeckLinkDevice: Failed to get profile manager for device: %s", ModelName.c_str());
 		return;
 	}
-	// TODO: Should this be here?
-	IDeckLinkProfile *profile = nullptr;
-	res = ProfileManager->GetProfile(bmdProfileFourSubDevicesHalfDuplex, &profile);
-	if (FAILED(res))
-		nosEngine.LogE("DeckLinkDevice: Failed to get profile for device: %s", ModelName.c_str());
-	int active = false;
-	res = profile->IsActive(&active);
-	if (FAILED(res))
-		nosEngine.LogE("DeckLinkDevice: Failed to get profile active status for device: %s", ModelName.c_str());
-	if (!active)
-		profile->SetActive();
-	Release(profile);
 }
 
 SubDevice::~SubDevice()
@@ -204,27 +260,75 @@ SubDevice::~SubDevice()
 		Release(frame);
 }
 
-bool SubDevice::CanDoMode(nosDeckLinkMode mode)
+bool SubDevice::IsBusyWith(nosMediaIODirection mode)
 {
-	return !ActiveModes[mode];
+	return ActiveModes[mode];
+}
+
+std::set<nosMediaIOFrameGeometry> SubDevice::GetSupportedOutputFrameGeometries(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats)
+{
+	std::set<nosMediaIOFrameGeometry> supportedFrameGeometries;
+	if (!Output)
+	{
+		nosEngine.LogE("SubDevice: Output interface is not available for device: %s", ModelName.c_str());
+		return supportedFrameGeometries;
+	}
+
+	for (auto& pixelFormat : pixelFormats)
+	{
+		for (int i = NOS_MEDIAIO_FG_MIN; i < NOS_MEDIAIO_FG_MAX; ++i)
+		{
+			auto fg = static_cast<nosMediaIOFrameGeometry>(i);
+			for (auto& displayMode : GetDisplayModesForFrameGeometry(fg))
+			{
+				if (DoesSupportOutputVideoMode(displayMode, GetDeckLinkPixelFormat(pixelFormat)))
+				{
+					supportedFrameGeometries.insert(fg);
+					break;
+				}
+			}
+		}
+	}
+	return supportedFrameGeometries;
+}
+
+bool SubDevice::DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
+{
+	if (!Output)
+		return false;
+	BOOL supported{};
+	BMDDisplayMode actualDisplayMode{};
+	auto res = Output->DoesSupportVideoMode(bmdVideoConnectionSDI, displayMode, pixelFormat, bmdNoVideoOutputConversion, bmdSupportedVideoModeDefault, &actualDisplayMode, &supported);
+	if (FAILED(res))
+	{
+		nosEngine.LogE("SubDevice: Failed to check video mode support for device: %s", ModelName.c_str());
+		return false;
+	}
+	if (!supported && actualDisplayMode == displayMode)
+	{
+		// Supported but with conversion
+		nosEngine.LogW("SubDevice: Video mode %d is supported but with conversion for device: %s", displayMode, ModelName.c_str());
+		return true;
+	}
+	return supported;
 }
 
 bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 {
 	if (!Output) 
 	{
-		nosEngine.LogE("DeckLinkDevice: Output interface is not available for device: %s", ModelName.c_str());
-		return false;
-	}
-	
-	auto res = Output->EnableVideoOutput(displayMode, bmdVideoOutputFlagDefault);
-	if (FAILED(res))
-	{
-		nosEngine.LogE("DeckLinkDevice: Failed to enable video output for device: %s", ModelName.c_str());
+		nosEngine.LogE("SubDevice: Output interface is not available for device: %s", ModelName.c_str());
 		return false;
 	}
 
-	ActiveModes[NOS_DECK_LINK_MODE_OUTPUT] = true;
+	auto res = Output->EnableVideoOutput(displayMode, bmdVideoOutputFlagDefault);
+	if (FAILED(res))
+	{
+		nosEngine.LogE("SubDevice: Failed to enable video output for device: %s", ModelName.c_str());
+		return false;
+	}
+
+	ActiveModes[NOS_MEDIAIO_DIRECTION_OUTPUT] = true;
 
 	for (auto& frame : VideoFrames)
 		Release(frame);
@@ -237,7 +341,7 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 			res = Output->GetDisplayMode(displayMode, &displayModeInterface);
 			if (FAILED(res))
 			{
-				nosEngine.LogE("DeckLinkDevice: Failed to get display mode for device: %s", ModelName.c_str());
+				nosEngine.LogE("SubDevice: Failed to get display mode for device: %s", ModelName.c_str());
 				return false;
 			}
 			width = displayModeInterface->GetWidth();
@@ -245,7 +349,7 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 			res = displayModeInterface->GetFrameRate(&FrameDuration, &TimeScale);
 			if (FAILED(res))
 			{
-				nosEngine.LogE("DeckLinkDevice: Failed to get frame rate for device: %s", ModelName.c_str());
+				nosEngine.LogE("SubDevice: Failed to get frame rate for device: %s", ModelName.c_str());
 				return false;
 			}
 			Release(displayModeInterface);
@@ -253,7 +357,7 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 		Output->CreateVideoFrame(width, height, width * 2, pixelFormat, bmdFrameFlagDefault, &frame);
 		if (!frame)
 		{
-			nosEngine.LogE("DeckLinkDevice: Failed to create video frame for device: %s", ModelName.c_str());
+			nosEngine.LogE("SubDevice: Failed to create video frame for device: %s", ModelName.c_str());
 			return false;
 		}
 	}
@@ -263,15 +367,22 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 		nosEngine.LogE("Could not create output callback");
 	res = Output->SetScheduledFrameCompletionCallback(outputCallback);
 	if (FAILED(res))
-		nosEngine.LogE("DeckLinkDevice: Failed to set output callback for device: %s", ModelName.c_str());
+		nosEngine.LogE("SubDevice: Failed to set output callback for device: %s", ModelName.c_str());
 
 	res = Output->StartScheduledPlayback(0, TimeScale, 1.0);
 	if (FAILED(res))
-		nosEngine.LogE("DeckLinkDevice: Failed to start scheduled playback for device: %s", ModelName.c_str());
+		nosEngine.LogE("SubDevice: Failed to start scheduled playback for device: %s", ModelName.c_str());
 
 	for (size_t i = 0; i < VideoFrames.size(); ++i)
 		ScheduleNextFrame();
 	return true;
+}
+
+bool SubDevice::OpenInput(BMDPixelFormat pixelFormat)
+{
+	
+	nosEngine.LogE("Unimplemented");
+	return false;
 }
 
 bool SubDevice::WaitFrameCompletion()
@@ -324,6 +435,29 @@ nosVec2u SubDevice::GetDeltaSeconds() const
 	return nosVec2u{ (uint32_t)FrameDuration, (uint32_t)TimeScale };
 }
 
+class ProfileChangeCallback : public Object<IDeckLinkProfileCallback>
+{
+public:
+	ProfileChangeCallback(Device* deckLinkDevice) :
+		Device(deckLinkDevice)
+	{
+	}
+
+	HRESULT	STDMETHODCALLTYPE ProfileChanging(IDeckLinkProfile* newProfile, dlbool_t streamsWillBeForcedToStop) override
+	{
+		Device->ClearSubDevices();
+		return S_OK;
+	}
+	HRESULT	STDMETHODCALLTYPE ProfileActivated(IDeckLinkProfile* newProfile) override
+	{
+		auto groupId = Device->GroupId;
+		Device->Reinit(groupId);
+		return S_OK;
+	}
+
+	Device* Device;
+};
+
 Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevices)
 	: Index(index), SubDevices(std::move(subDevices))
 {
@@ -334,77 +468,54 @@ Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevi
 		ModelName = SubDevices[0]->ModelName;
 		GroupId = SubDevices[0]->DeviceGroupId;
 	}
-}
-
-bool Device::InitializeDeviceList()
-{
-	IDeckLinkIterator* deckLinkIterator = nullptr;
-
-	HRESULT result = E_FAIL;
-#ifdef _WIN32
-	result = CoInitialize(NULL);
-	if (FAILED(result))
-	{
-		nosEngine.LogE("DeckLinkDevice: Initialization of COM failed with error: %s", _com_error(result).ErrorMessage());
-		return false;
-	}
-#endif
-
-	result = GetDeckLinkIterator(&deckLinkIterator);
-	if (FAILED(result))
-	{
-		return false;
-	}
-
-	IDeckLink* deckLink = NULL;
-	uint32_t   deviceNumber = 0;
-
-	// Obtain an IDeckLink instance for each device on the system
-	std::vector<std::unique_ptr<SubDevice>> subDevices;
-	while (deckLinkIterator->Next(&deckLink) == S_OK)
-	{
-		auto bmDevice = std::make_unique<SubDevice>(deckLink);
-		subDevices.push_back(std::move(bmDevice));
-		deviceNumber++;
-	}
-
-	if (deckLinkIterator)
-		deckLinkIterator->Release();
-
-	std::unordered_map<int64_t, std::vector<std::unique_ptr<SubDevice>>> subDevicePerDevice;
-	for (auto& subDevice : subDevices)
-		subDevicePerDevice[subDevice->DeviceGroupId].push_back(std::move(subDevice));
-
-	uint32_t deviceIndex = 0;
-	for (auto& [groupId, subDevices] : subDevicePerDevice)
-	{
-		Devices.push_back(std::make_unique<Device>(deviceIndex, std::move(subDevices)));
-		++deviceIndex;
-	}
 	
-	return true;
+	// Determine which sub-devices are capable of opening the channel
+	auto& channelMap = GetChannelMap();
+	auto modelIt = channelMap.find(ModelName);
+	if (modelIt == channelMap.end())
+	{
+		nosEngine.LogE("No channel map found for device: %s", ModelName.c_str());
+		return;
+	}
+	auto& mapping = modelIt->second;
+	for (auto& [profile, rest2] : mapping)
+	{
+		if (profile != bmdProfileFourSubDevicesHalfDuplex)
+			continue; // TODO.
+		for (auto& [subDeviceIndex, rest3] : rest2)
+		{
+			for (auto& [curChannel, modes] : rest3)
+			{
+				if (auto subDevice = GetSubDevice(subDeviceIndex))
+				{
+					for (auto mode : modes)
+					{
+						Channel2SubDevice[mode][curChannel] = subDevice;
+					}
+				}
+			}
+		}
+	}
+
+	auto profileChangeCallback = new ProfileChangeCallback(this);
+	if (profileChangeCallback == nullptr)
+		nosEngine.LogE("Could not create profile change callback");
+	else
+		GetProfileManager()->SetCallback(profileChangeCallback);
 }
 
-void Device::ClearDeviceList()
+void Device::Reinit(uint32_t groupId)
 {
-	Devices.clear();
-}
-
-Device* Device::GetDevice(int64_t groupId)
-{
-	for (auto& device : Devices)
+	ClearSubDevices();
+	auto devices = InitializeDevices();
+	for (auto& device : devices)
 	{
 		if (device->GroupId == groupId)
-			return device.get();
+		{
+			*this = std::move(*device);
+			break;
+		}
 	}
-	return nullptr;
-}
-
-Device* Device::GetDevice(uint32_t deviceIndex)
-{
-	if (deviceIndex < Devices.size())
-		return Devices[deviceIndex].get();
-	return nullptr;
 }
 
 std::string Device::GetUniqueDisplayName() const
@@ -412,18 +523,18 @@ std::string Device::GetUniqueDisplayName() const
 	return ModelName + " - " + std::to_string(Index);
 }
 
-std::vector<nosDeckLinkChannel> Device::GetAvailableChannels(nosDeckLinkMode mode)
+std::vector<nosDeckLinkChannel> Device::GetAvailableChannels(nosMediaIODirection mode)
 {
 	std::vector<nosDeckLinkChannel> channels;
 	static std::array allChannels {
-		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_1,
-		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_2,
-		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_3,
-		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_4,
-		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_5,
-		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_6,
-		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_7,
-		NOS_DECK_LINK_CHANNEL_SINGLE_LINK_8
+		NOS_DECKLINK_CHANNEL_SINGLE_LINK_1,
+		NOS_DECKLINK_CHANNEL_SINGLE_LINK_2,
+		NOS_DECKLINK_CHANNEL_SINGLE_LINK_3,
+		NOS_DECKLINK_CHANNEL_SINGLE_LINK_4,
+		NOS_DECKLINK_CHANNEL_SINGLE_LINK_5,
+		NOS_DECKLINK_CHANNEL_SINGLE_LINK_6,
+		NOS_DECKLINK_CHANNEL_SINGLE_LINK_7,
+		NOS_DECKLINK_CHANNEL_SINGLE_LINK_8
 	};
 	for (auto& channel : allChannels)
 	{
@@ -433,36 +544,50 @@ std::vector<nosDeckLinkChannel> Device::GetAvailableChannels(nosDeckLinkMode mod
 	return channels;
 }
 
-bool Device::CanOpenChannel(nosDeckLinkMode mode, nosDeckLinkChannel channel) const
+bool Device::CanOpenChannel(nosMediaIODirection dir, nosDeckLinkChannel channel, SubDevice** outSubDevice) const
 {
-	// Determine which sub-devices are capable of opening the channel
-	for (auto& [modelName, rest] : GetChannelMap())
+	auto dit = Channel2SubDevice.find(dir);
+	if (dit != Channel2SubDevice.end())
 	{
-		if (modelName != ModelName)
-			continue;
-		for (auto& [profile, rest2] : rest)
+		auto cit = dit->second.find(channel);
+		if (cit != dit->second.end())
 		{
-			if (profile != bmdProfileFourSubDevicesHalfDuplex)
-				continue;
-			for (auto& [subDeviceIndex, rest3] : rest2)
+			auto* subDevice = cit->second;
+			if (!subDevice->IsBusyWith(dir))
 			{
-				for (auto& [curChannel, modes] : rest3)
-				{
-					if (curChannel == channel && modes.contains(mode))
-					{
-						if (auto subDevice = GetSubDevice(subDeviceIndex))
-						{
-							if (subDevice->CanDoMode(mode))
-								return true;
-						}
-						return true;
-					}
-				}
+				if (outSubDevice)
+					*outSubDevice = subDevice;
+				return true;
 			}
 		}
 	}
-	
 	return false;
+}
+
+bool Device::OpenOutputChannel(nosDeckLinkChannel channel,
+							   BMDDisplayMode displayMode, BMDPixelFormat pixelFormat,
+							   SubDevice** outSubDevice)
+{
+	SubDevice* subDevice = nullptr;
+	if (!CanOpenChannel(NOS_MEDIAIO_DIRECTION_OUTPUT, channel, &subDevice))
+		return false;
+	if (outSubDevice)
+		*outSubDevice = subDevice;
+	if (!subDevice->OpenOutput(displayMode, pixelFormat))
+		return false;
+	return true;
+}
+
+SubDevice* Device::GetSubDeviceOfChannel(nosMediaIODirection dir, nosDeckLinkChannel channel) const
+{
+	auto dit = Channel2SubDevice.find(dir);
+	if (dit != Channel2SubDevice.end())
+	{
+		auto cit = dit->second.find(channel);
+		if (cit != dit->second.end())
+			return cit->second;
+	}
+	return nullptr;
 }
 
 SubDevice* Device::GetSubDevice(int64_t index) const
@@ -470,5 +595,89 @@ SubDevice* Device::GetSubDevice(int64_t index) const
 	if (index < SubDevices.size())
 		return SubDevices[index].get();
 	return nullptr;
+}
+
+IDeckLinkProfileManager* Device::GetProfileManager() const
+{
+	if (SubDevices.empty())
+		return nullptr;
+	return SubDevices[0]->ProfileManager;
+}
+
+std::optional<BMDProfileID> Device::GetActiveProfile() const
+{
+	if (SubDevices.empty())
+		return std::nullopt;
+	auto& subDevice = SubDevices[0];
+	IDeckLinkProfileIterator* profileIterator = nullptr;
+	auto res = subDevice->ProfileManager->GetProfiles(&profileIterator);
+	if (FAILED(res))
+	{
+		nosEngine.LogE("DeckLinkDevice: Failed to get profile iterator for device: %s", ModelName.c_str());
+		return std::nullopt;
+	}
+	IDeckLinkProfile* profile = nullptr;
+	while (profileIterator->Next(&profile) == S_OK)
+	{
+		BOOL active = false;
+		if (profile->IsActive(&active) == S_OK && active)
+		{
+			IDeckLinkProfileAttributes* profileAttributes = nullptr;
+			if (profile->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&profileAttributes) == S_OK)
+			{
+				int64_t profileId{};
+				if (profileAttributes->GetInt(BMDDeckLinkProfileID, &profileId) == S_OK)
+				{
+					Release(profileAttributes);
+					Release(profileIterator);
+					return BMDProfileID(profileId);
+				}
+				Release(profileAttributes);
+			}
+		}
+		Release(profile);
+	}
+	return std::nullopt;
+}
+
+void Device::UpdateProfile(BMDProfileID profileId)
+{
+	if (SubDevices.empty())
+		return;
+	auto& subDevice = SubDevices[0];
+	IDeckLinkProfileIterator* profileIterator = nullptr;
+	auto res = subDevice->ProfileManager->GetProfiles(&profileIterator);
+	if (FAILED(res))
+	{
+		nosEngine.LogE("DeckLinkDevice: Failed to get profile iterator for device: %s", ModelName.c_str());
+		return;
+	}
+	IDeckLinkProfile* profile = nullptr;
+	while (profileIterator->Next(&profile) == S_OK)
+	{
+		IDeckLinkProfileAttributes* profileAttributes = nullptr;
+		if (profile->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&profileAttributes) == S_OK)
+		{
+			int64_t profileId{};
+			if (profileAttributes->GetInt(BMDDeckLinkProfileID, &profileId) == S_OK)
+			{
+				if (profileId == profileId)
+				{
+					if (profile->SetActive() != S_OK)
+						nosEngine.LogE("DeckLinkDevice: Failed to set profile for device: %s", ModelName.c_str());
+				Release(profileAttributes);
+				Release(profileIterator);
+			}
+			Release(profileAttributes);
+		}
+		Release(profile);
+	}
+	Release(profileIterator);
+}
+}
+
+void Device::ClearSubDevices()
+{
+	SubDevices.clear();
 }
 }

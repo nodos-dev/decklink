@@ -3,14 +3,17 @@
 #include <Nodos/PluginHelpers.hpp>
 #include <nosVulkanSubsystem/nosVulkanSubsystem.h>
 #include <nosDeckLinkDevice/nosDeckLinkDevice.h>
+#include <nosMediaIO/nosMediaIO.h>
 
 NOS_INIT_WITH_MIN_REQUIRED_MINOR(0)
 NOS_VULKAN_INIT()
 NOS_DECKLINK_DEVICE_SUBSYSTEM_INIT()
+NOS_MEDIAIO_SUBSYSTEM_INIT()
 
 NOS_BEGIN_IMPORT_DEPS()
 	NOS_DECKLINK_DEVICE_SUBSYSTEM_IMPORT()
 	NOS_VULKAN_IMPORT()
+	NOS_MEDIAIO_SUBSYSTEM_IMPORT()
 NOS_END_IMPORT_DEPS()
 
 namespace nos::decklink

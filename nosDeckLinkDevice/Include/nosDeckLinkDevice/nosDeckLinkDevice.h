@@ -12,6 +12,9 @@ extern "C"
 
 #include <Nodos/Types.h>
 
+// nos.sys.mediaio
+#include <nosMediaIO/nosMediaIO.h>
+
 typedef struct nosDeckLinkDeviceDesc {
 	uint32_t DeviceIndex;
 	char UniqueDisplayName[256];
@@ -19,32 +22,66 @@ typedef struct nosDeckLinkDeviceDesc {
 
 typedef enum nosDeckLinkChannel
 {
-	NOS_DECK_LINK_CHANNEL_INVALID,
-	NOS_DECK_LINK_CHANNEL_SINGLE_LINK_1,
-	NOS_DECK_LINK_CHANNEL_SINGLE_LINK_2,
-	NOS_DECK_LINK_CHANNEL_SINGLE_LINK_3,
-	NOS_DECK_LINK_CHANNEL_SINGLE_LINK_4,
-	NOS_DECK_LINK_CHANNEL_SINGLE_LINK_5,
-	NOS_DECK_LINK_CHANNEL_SINGLE_LINK_6,
-	NOS_DECK_LINK_CHANNEL_SINGLE_LINK_7,
-	NOS_DECK_LINK_CHANNEL_SINGLE_LINK_8,
+	NOS_DECKLINK_CHANNEL_INVALID,
+	NOS_DECKLINK_CHANNEL_SINGLE_LINK_1,
+	NOS_DECKLINK_CHANNEL_SINGLE_LINK_2,
+	NOS_DECKLINK_CHANNEL_SINGLE_LINK_3,
+	NOS_DECKLINK_CHANNEL_SINGLE_LINK_4,
+	NOS_DECKLINK_CHANNEL_SINGLE_LINK_5,
+	NOS_DECKLINK_CHANNEL_SINGLE_LINK_6,
+	NOS_DECKLINK_CHANNEL_SINGLE_LINK_7,
+	NOS_DECKLINK_CHANNEL_SINGLE_LINK_8,
+	NOS_DECKLINK_CHANNEL_MAX = NOS_DECKLINK_CHANNEL_SINGLE_LINK_8
 } nosDeckLinkChannel;
+
+#define NOS_DECKLINK_CHANNEL_COUNT (NOS_DECKLINK_CHANNEL_SINGLE_LINK_8 - NOS_DECKLINK_CHANNEL_INVALID)
+
+inline const char* NOS_DECKLINK_CHANNEL_NAMES[] = {
+	"INVALID",
+	"Single Link 1",
+	"Single Link 2",
+	"Single Link 3",
+	"Single Link 4",
+	"Single Link 5",
+	"Single Link 6",
+	"Single Link 7",
+	"Single Link 8",
+};
 
 typedef struct nosDeckLinkChannelList {
 	size_t Count;
-	nosDeckLinkChannel Channels[NOS_DECK_LINK_CHANNEL_SINGLE_LINK_8 - NOS_DECK_LINK_CHANNEL_INVALID];
+	nosDeckLinkChannel Channels[NOS_DECKLINK_CHANNEL_COUNT];
 } nosDeckLinkAvailableChannels;
 
-typedef enum nosDeckLinkMode
+typedef struct nosDeckLinkOpenChannelParams
 {
-	NOS_DECK_LINK_MODE_INPUT,
-	NOS_DECK_LINK_MODE_OUTPUT,
-} nosDeckLinkMode;
+	nosMediaIODirection Direction;
+	nosDeckLinkChannel Channel;
+	nosMediaIOPixelFormat PixelFormat;
+	struct
+	{
+		nosMediaIOFrameGeometry Geometry;
+		nosMediaIOFrameRate FrameRate;	
+	} Output; // Don't care if Direction == NOS_MEDIAIO_DIRECTION_INPUT
+} nosDeckLinkOpenOutputParams;
 
+typedef struct nosDeckLinkFrameGeometryList {
+	size_t Count;
+	nosMediaIOFrameGeometry Geometries[NOS_MEDIAIO_FRAME_GEOMETRY_COUNT];
+} nosDeckLinkFrameGeometryList;
+	
 typedef struct nosDeckLinkSubsystem {
 	void (NOSAPI_CALL* GetDevices)(size_t *inoutCount, nosDeckLinkDeviceDesc* outDeviceDescriptors);
-	nosResult (NOSAPI_CALL* GetAvailableChannels)(uint32_t deviceIndex, nosDeckLinkMode mode, nosDeckLinkChannelList* outChannels);
+	nosResult (NOSAPI_CALL* GetAvailableChannels)(uint32_t deviceIndex, nosMediaIODirection direction, nosDeckLinkChannelList* outChannels);
 	const char* (NOSAPI_CALL* GetChannelName)(nosDeckLinkChannel channel);
+	nosDeckLinkChannel (NOSAPI_CALL* GetChannelByName)(const char* channelName);
+	nosResult (NOSAPI_CALL* GetDeviceByUniqueDisplayName)(const char* uniqueDisplayName, uint32_t* outDeviceIndex);
+
+	// Channels
+	nosResult (NOSAPI_CALL* GetSupportedOutputFrameGeometries)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkFrameGeometryList* outGeometries);
+	nosResult (NOSAPI_CALL* CanOpenChannel)(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params);
+	nosResult (NOSAPI_CALL* OpenChannel)(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params);
+	nosResult (NOSAPI_CALL* CloseChannel)(uint32_t deviceIndex, nosDeckLinkChannel channel);
 } nosDeckLinkSubsystem;
 
 #pragma region Helper Declarations & Macros

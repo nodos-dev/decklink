@@ -19,6 +19,7 @@
 
 namespace nos::decklink
 {
+std::vector<std::unique_ptr<class Device>> InitializeDevices();
 
 class SubDevice
 {
@@ -26,7 +27,8 @@ public:
 	friend class OutputCallback;
 	SubDevice(IDeckLink* deviceInterface);
 	~SubDevice();
-	bool CanDoMode(nosDeckLinkMode mode);
+	bool IsBusyWith(nosMediaIODirection mode);
+	std::set<nosMediaIOFrameGeometry> GetSupportedOutputFrameGeometries(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats);
 
 	std::string ModelName;
 	int64_t SubDeviceIndex = -1;
@@ -36,21 +38,23 @@ public:
 	int64_t TopologicalId = -1;
 	std::string Handle;
 	std::vector<std::string> ProfileNames;
+
+	// Output
+	bool DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
 	bool OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
-
 	bool WaitFrameCompletion();
-
 	void ScheduleNextFrame();
-
 	void DmaWrite(void* buffer, size_t size);
 	nosVec2u GetDeltaSeconds() const;
 	
+	bool OpenInput(BMDPixelFormat pixelFormat);
+
+	IDeckLinkProfileManager* ProfileManager = nullptr;
 protected:
 	IDeckLink* Device = nullptr;
 	IDeckLinkInput* Input = nullptr;
 	IDeckLinkOutput* Output = nullptr;
 	IDeckLinkProfileAttributes* ProfileAttributes = nullptr;
-	IDeckLinkProfileManager* ProfileManager = nullptr;
 	BMDTimeValue FrameDuration = 0;
 	BMDTimeScale TimeScale = 0;
 	
@@ -62,34 +66,46 @@ protected:
 	uint32_t TotalFramesScheduled = 0;
 	uint32_t NextFrameToSchedule = 0;
 
-	std::unordered_map<nosDeckLinkMode, bool> ActiveModes;
+	std::unordered_map<nosMediaIODirection, bool> ActiveModes;
 };
 
 class Device
 {
 public:
 	Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevices);
-	static bool InitializeDeviceList();
-	static void ClearDeviceList();
-	static Device* GetDevice(int64_t groupId);
-	static Device* GetDevice(uint32_t deviceIndex);
-	static const std::vector<std::unique_ptr<Device>>& GetDevices() { return Devices; }
+
+	void Reinit(uint32_t groupId);
 
 	std::string GetUniqueDisplayName() const;
 
-	std::vector<nosDeckLinkChannel> GetAvailableChannels(nosDeckLinkMode mode);
+	std::vector<nosDeckLinkChannel> GetAvailableChannels(nosMediaIODirection mode);
 
-	bool CanOpenChannel(nosDeckLinkMode mode, nosDeckLinkChannel channel) const;
+	bool CanOpenChannel(nosMediaIODirection dir, nosDeckLinkChannel channel, SubDevice** outSubDevice = nullptr) const;
+
+	bool OpenOutputChannel(nosDeckLinkChannel channel,
+						   BMDDisplayMode displayMode,
+						   BMDPixelFormat pixelFormat,
+						   SubDevice** outSubDevice);
+
+	SubDevice* GetSubDeviceOfChannel(nosMediaIODirection dir, nosDeckLinkChannel channel) const;
 
 	SubDevice* GetSubDevice(int64_t index) const;
+
+	IDeckLinkProfileManager* GetProfileManager() const;
+
+	std::optional<BMDProfileID> GetActiveProfile() const;
+	
+	/// Once used, this device should be recreated.
+	void UpdateProfile(BMDProfileID profileId);
+
+	void ClearSubDevices();
 
 	uint32_t Index = -1;
 	int64_t GroupId = -1;
 	std::string ModelName;
 protected:
 	std::vector<std::unique_ptr<SubDevice>> SubDevices;
-
-	inline static std::vector<std::unique_ptr<Device>> Devices;
+	std::unordered_map<nosMediaIODirection, std::unordered_map<nosDeckLinkChannel, SubDevice*>> Channel2SubDevice;
 };
 	
 }

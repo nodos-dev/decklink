@@ -13,6 +13,13 @@ endif()
 nos_find_sdk("1.3.0" NOS_PLUGIN_SDK_TARGET NOS_SUBSYSTEM_SDK_TARGET NOS_SDK_DIR)
 set(FLATC_EXECUTABLE ${NOS_SDK_DIR}/bin/flatc${CMAKE_EXECUTABLE_SUFFIX})
 
+# nos.sys.mediaio
+nos_get_module("nos.sys.mediaio" "1.0" NOS_SYS_MEDIAIO_TARGET_1_0)
+nos_find_module_path("nos.sys.mediaio" "1.0" NOS_SYS_MEDIAIO_PATH)
+nos_generate_flatbuffers("${NOS_SYS_MEDIAIO_PATH}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Source/Generated" "cpp" "${NOS_SYS_MEDIAIO_PATH};${NOS_SDK_DIR}/types" generated_nosDeckLinkDevice_dep_nosSysMediaIO)
+
+nos_generate_flatbuffers("${CMAKE_CURRENT_SOURCE_DIR}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Include/nosDeckLinkDevice" "cpp" "${NOS_SDK_DIR}/types" generated_nosDeckLinkDevice)
+
 # DeckLink SDK
 # ------------
 set(DECKLINK_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/DeckLinkSDK/")
@@ -60,15 +67,15 @@ if (WIN32)
     add_custom_target(DeckLinkMIDL DEPENDS ${MIDL_OUTPUT})
 endif()
 
-list(APPEND DEPENDENCIES ${NOS_PLUGIN_SDK_TARGET})
+list(APPEND DEPENDENCIES ${NOS_SUBSYSTEM_SDK_TARGET} ${NOS_SYS_MEDIAIO_TARGET_1_0} generated_nosDeckLinkDevice generated_nosDeckLinkDevice_dep_nosSysMediaIO)
 if (WIN32)
     list(APPEND DEPENDENCIES DeckLinkMIDL)
 endif()
 list(APPEND INCLUDE_FOLDERS
-    ${EXTERNAL_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include
-    ${CMAKE_CURRENT_BINARY_DIR})
+     ${EXTERNAL_DIR}
+     ${CMAKE_CURRENT_SOURCE_DIR}/Source
+     ${CMAKE_CURRENT_SOURCE_DIR}/Include
+     ${CMAKE_CURRENT_BINARY_DIR})
 
 nos_add_subsystem("nosDeckLinkDevice" "${DEPENDENCIES}" "${INCLUDE_FOLDERS}")
 

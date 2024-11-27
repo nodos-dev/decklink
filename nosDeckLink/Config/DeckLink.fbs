@@ -1,13 +1,7 @@
 namespace nos.decklink;
 
-table ChannelInfo {
-    sub_device: string;
-    channel_name: string;
+struct ChannelId {
+    device_index: int;
+    channel_index: int;
     is_input: bool;
-    video_format: string;
-    video_format_idx: int;
-    frame_buffer_format: nos.mediaio.YCbCrPixelFormat;
-    is_quad: bool;
-    resolution: nos.fb.vec2u;
-    is_interlaced: bool;
 }

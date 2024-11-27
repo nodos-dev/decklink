@@ -20,7 +20,7 @@
                 },
                 {
                     "name": "Channel",
-                    "type_name": "nos.decklink.ChannelInfo",
+                    "type_name": "nos.decklink.ChannelId",
                     "show_as": "OUTPUT_PIN",
                     "can_show_as": "OUTPUT_PIN_OR_PROPERTY"
                 },
