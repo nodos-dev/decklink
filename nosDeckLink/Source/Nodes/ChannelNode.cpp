@@ -11,9 +11,7 @@ NOS_REGISTER_NAME(ChannelName);
 NOS_REGISTER_NAME(IsInput);
 NOS_REGISTER_NAME(Resolution);
 NOS_REGISTER_NAME(FrameRate);
-NOS_REGISTER_NAME(IsInterlaced);
 NOS_REGISTER_NAME(IsOpen);
-NOS_REGISTER_NAME(FrameBufferFormat);
 
 enum class ChangedPinType
 {
@@ -33,7 +31,6 @@ public:
 		SetPinVisualizer(NSN_ChannelName, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetChannelStringListName()});
 		SetPinVisualizer(NSN_Resolution, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetResolutionStringListName()});
 		SetPinVisualizer(NSN_FrameRate, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetFrameRateStringListName()});
-		SetPinVisualizer(NSN_IsInterlaced, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetInterlacedStringListName()});
 
 		UpdateStringList(GetDeviceStringListName(), GetPossibleDeviceNames());
 
@@ -86,15 +83,25 @@ public:
 			UpdateAfter(ChangedPinType::ChannelName, !oldValue);
 		});
 		AddPinValueWatcher(NSN_Resolution, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
-			
+			ResolutionPinValue = InterpretPinValue<const char>(newVal);
+			auto newResolution = nosMediaIO->GetFrameGeometryFromString(ResolutionPinValue.c_str());
+			if (CurrentChannel.Resolution != newResolution)
+			{
+				// todo: close if open
+			}
+			CurrentChannel.Resolution = newResolution;
+			if (ResolutionPinValue != "NONE" && newResolution == NOS_MEDIAIO_FG_INVALID)
+				SetPinValue(NSN_Resolution, nosBuffer{.Data = (void*)"NONE", .Size = 5});
+			else
+			{
+				if (oldValue)
+					ResetAfter(ChangedPinType::Resolution);
+				else if (ResolutionPinValue == "NONE")
+					AutoSelectIfSingle(NSN_Resolution, GetPossibleResolutions());
+			}
+			UpdateAfter(ChangedPinType::Resolution, !oldValue);
 		});
 		AddPinValueWatcher(NSN_FrameRate, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
-			
-		});
-		AddPinValueWatcher(NSN_IsInterlaced, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
-
-		});
-		AddPinValueWatcher(NSN_FrameBufferFormat, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			
 		});
     }
@@ -120,8 +127,6 @@ public:
 		case ChangedPinType::IsInput: {
 			ChangePinReadOnly(NSN_Resolution, IsInput);
 			ChangePinReadOnly(NSN_FrameRate, IsInput);
-			ChangePinReadOnly(NSN_IsInterlaced, IsInput);
-			// ChangePinReadOnly(NSN_ReferenceSource, IsInput);
 
 			auto deviceList = GetPossibleDeviceNames();
 			UpdateStringList(GetDeviceStringListName(), deviceList);
@@ -135,23 +140,6 @@ public:
 			UpdateStringList(GetChannelStringListName(), channelList);
 			if (!first)
 				AutoSelectIfSingle(NSN_ChannelName, channelList);
-			// if (IsInput || !Device)
-			// {
-			// 	UpdateStringList(GetReferenceStringListName(), { "NONE" });
-			// 	SetPinValue(NSN_ReferenceSource, nosBuffer{ .Data = (void*)"NONE", .Size = 5 });
-			// }
-			// else
-			// {
-			// 	std::vector<std::string> list{"Reference In", "Free Run"};
-			// 	for (int i = 1; i <= NTV2DeviceGetNumVideoInputs(Device->ID); ++i)
-			// 		list.push_back("SDI In " + std::to_string(i));
-			// 	UpdateStringList(3GetReferenceStringListName(), list);
-			// 	if (!first && Device->GetReference(ReferenceSource))
-			// 	{
-			// 		auto refStr = NTV2ReferenceSourceToString(ReferenceSource, true);
-			// 		SetPinValue(NSN_ReferenceSource, nosBuffer{ .Data = (void*)refStr.c_str(), .Size = refStr.size() + 1 });
-			// 	}
-			// }
 			break;
 		}
 		case ChangedPinType::ChannelName: {
@@ -168,13 +156,6 @@ public:
 			UpdateStringList(GetFrameRateStringListName(), frameRateList);
 			if (!first)
 				AutoSelectIfSingle(NSN_FrameRate, frameRateList);
-			break;
-		}
-		case ChangedPinType::FrameRate: {
-			auto interlacedList = GetPossibleInterlaced();
-			UpdateStringList(GetInterlacedStringListName(), interlacedList);
-			if (!first)
-				AutoSelectIfSingle(NSN_IsInterlaced, interlacedList);
 			break;
 		}
 		}
@@ -198,9 +179,6 @@ public:
 		case ChangedPinType::Resolution: 
 			pinToSet = NSN_FrameRate; 
 			break;
-		case ChangedPinType::FrameRate: 
-			pinToSet = NSN_IsInterlaced; 
-			break;
 		}
 		SetPinValue(pinToSet, nosBuffer{.Data = (void*)"NONE", .Size = 5});
 	}
@@ -221,10 +199,6 @@ public:
 	{ 
 		SetPinValue(NSN_FrameRate, nosBuffer{.Data = (void*)"NONE", .Size = 5});
 	}
-	void ResetInterlacedPin()
-	{ 
-		SetPinValue(NSN_IsInterlaced, nosBuffer{.Data = (void*)"NONE", .Size = 5});
-	}
 
     nosResult ExecuteNode(nosNodeExecuteParams* params) override
     {
@@ -235,7 +209,6 @@ public:
 	std::string GetChannelStringListName() { return "decklink.ChannelList." + UUID2STR(NodeId); }
 	std::string GetResolutionStringListName() { return "decklink.ResolutionList." + UUID2STR(NodeId); }
 	std::string GetFrameRateStringListName() { return "decklink.FrameRateList." + UUID2STR(NodeId); }
-	std::string GetInterlacedStringListName() { return "decklink.InterlacedList." + UUID2STR(NodeId); }
 
 	std::vector<std::string> GetPossibleDeviceNames()
     {
@@ -270,7 +243,7 @@ public:
 		std::vector<std::string> possibleResolutions = {"NONE"};
     	if (CurrentChannel.Channel == NOS_DECKLINK_CHANNEL_INVALID)
 			return possibleResolutions;
-    	nosDeckLinkFrameGeometryList frameGeometryList{};
+    	nosMediaIOFrameGeometryList frameGeometryList{};
     	nosDeckLink->GetSupportedOutputFrameGeometries(CurrentChannel.DeviceIndex, CurrentChannel.Channel, &frameGeometryList);
     	for (size_t i = 0; i < frameGeometryList.Count; i++)
     	{
@@ -284,36 +257,33 @@ public:
 	std::vector<std::string> GetPossibleFrameRates() 
 	{
 		std::vector<std::string> possibleFrameRates = {"NONE"};
+    	if (CurrentChannel.Channel == NOS_DECKLINK_CHANNEL_INVALID || CurrentChannel.Resolution == NOS_MEDIAIO_FG_INVALID)
+    		return possibleFrameRates;
+    	nosMediaIOFrameRateList frameRates{};
+    	nosDeckLink->GetSupportedOutputFrameRatesForGeometry(CurrentChannel.DeviceIndex, CurrentChannel.Channel, CurrentChannel.Resolution, &frameRates);
+    	for (size_t i = 0; i < frameRates.Count; i++)
+		{
+			auto& rate = frameRates.FrameRates[i];
+			auto name = nosMediaIO->GetFrameRateName(rate);
+			possibleFrameRates.push_back(name);
+		}
 		return possibleFrameRates;
-	}
-
-	std::vector<std::string> GetPossibleInterlaced()
-	{
-		std::vector<std::string> possibleInterlaced = {"NONE"};
-		return possibleInterlaced;
 	}
 
 	bool ShouldOpen = false;
 	bool IsInput = false;
-	bool ForceInterlaced = false;
 	std::string DevicePinValue = "NONE";
 	std::string ChannelPinValue = "NONE";
 	std::string ResolutionPinValue = "NONE";
 	std::string FrameRatePinValue = "NONE";
-	std::string InterlacedPinValue = "NONE";
-	std::string ReferenceSourcePinValue = "NONE";
-	enum class InterlacedState
-	{
-		NONE,
-		INTERLACED,
-		PROGRESSIVE
-	} InterlacedState = InterlacedState::NONE;
 
 	struct
 	{
 		int32_t DeviceIndex = -1;
 		bool IsOpen = false;
 		nosDeckLinkChannel Channel = NOS_DECKLINK_CHANNEL_INVALID;
+		nosMediaIOFrameGeometry Resolution = NOS_MEDIAIO_FG_INVALID;
+		nosMediaIOFrameRate FrameRate = NOS_MEDIAIO_FRAME_RATE_INVALID;
 	} CurrentChannel;
 };
 

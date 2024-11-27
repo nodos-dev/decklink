@@ -64,11 +64,6 @@ typedef struct nosDeckLinkOpenChannelParams
 		nosMediaIOFrameRate FrameRate;	
 	} Output; // Don't care if Direction == NOS_MEDIAIO_DIRECTION_INPUT
 } nosDeckLinkOpenOutputParams;
-
-typedef struct nosDeckLinkFrameGeometryList {
-	size_t Count;
-	nosMediaIOFrameGeometry Geometries[NOS_MEDIAIO_FRAME_GEOMETRY_COUNT];
-} nosDeckLinkFrameGeometryList;
 	
 typedef struct nosDeckLinkSubsystem {
 	void (NOSAPI_CALL* GetDevices)(size_t *inoutCount, nosDeckLinkDeviceDesc* outDeviceDescriptors);
@@ -78,7 +73,8 @@ typedef struct nosDeckLinkSubsystem {
 	nosResult (NOSAPI_CALL* GetDeviceByUniqueDisplayName)(const char* uniqueDisplayName, uint32_t* outDeviceIndex);
 
 	// Channels
-	nosResult (NOSAPI_CALL* GetSupportedOutputFrameGeometries)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkFrameGeometryList* outGeometries);
+	nosResult (NOSAPI_CALL* GetSupportedOutputFrameGeometries)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosMediaIOFrameGeometryList* outGeometries);
+	nosResult (NOSAPI_CALL* GetSupportedOutputFrameRatesForGeometry)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosMediaIOFrameGeometry geometry, nosMediaIOFrameRateList* outFrameRates);
 	nosResult (NOSAPI_CALL* CanOpenChannel)(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params);
 	nosResult (NOSAPI_CALL* OpenChannel)(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params);
 	nosResult (NOSAPI_CALL* CloseChannel)(uint32_t deviceIndex, nosDeckLinkChannel channel);

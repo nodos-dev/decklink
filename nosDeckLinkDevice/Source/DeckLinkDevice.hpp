@@ -28,7 +28,7 @@ public:
 	SubDevice(IDeckLink* deviceInterface);
 	~SubDevice();
 	bool IsBusyWith(nosMediaIODirection mode);
-	std::set<nosMediaIOFrameGeometry> GetSupportedOutputFrameGeometries(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats);
+	std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> GetSupportedOutputFrameGeometryAndFrameRates(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats);
 
 	std::string ModelName;
 	int64_t SubDeviceIndex = -1;

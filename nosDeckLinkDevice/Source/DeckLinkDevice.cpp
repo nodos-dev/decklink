@@ -265,13 +265,13 @@ bool SubDevice::IsBusyWith(nosMediaIODirection mode)
 	return ActiveModes[mode];
 }
 
-std::set<nosMediaIOFrameGeometry> SubDevice::GetSupportedOutputFrameGeometries(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats)
+std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> SubDevice::GetSupportedOutputFrameGeometryAndFrameRates(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats)
 {
-	std::set<nosMediaIOFrameGeometry> supportedFrameGeometries;
+	std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> supported;
 	if (!Output)
 	{
 		nosEngine.LogE("SubDevice: Output interface is not available for device: %s", ModelName.c_str());
-		return supportedFrameGeometries;
+		return supported;
 	}
 
 	for (auto& pixelFormat : pixelFormats)
@@ -283,13 +283,13 @@ std::set<nosMediaIOFrameGeometry> SubDevice::GetSupportedOutputFrameGeometries(s
 			{
 				if (DoesSupportOutputVideoMode(displayMode, GetDeckLinkPixelFormat(pixelFormat)))
 				{
-					supportedFrameGeometries.insert(fg);
+					supported[fg].insert(GetFrameRateFromDisplayMode(displayMode));
 					break;
 				}
 			}
 		}
 	}
-	return supportedFrameGeometries;
+	return supported;
 }
 
 bool SubDevice::DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
@@ -647,7 +647,7 @@ void Device::UpdateProfile(BMDProfileID profileId)
 	auto& subDevice = SubDevices[0];
 	IDeckLinkProfileIterator* profileIterator = nullptr;
 	auto res = subDevice->ProfileManager->GetProfiles(&profileIterator);
-	if (FAILED(res))
+	if (FAILED(res) || !profileIterator)
 	{
 		nosEngine.LogE("DeckLinkDevice: Failed to get profile iterator for device: %s", ModelName.c_str());
 		return;

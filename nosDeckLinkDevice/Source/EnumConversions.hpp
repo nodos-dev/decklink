@@ -93,4 +93,132 @@ constexpr BMDPixelFormat GetDeckLinkPixelFormat(nosMediaIOPixelFormat fmt)
 	}
 	return bmdFormatUnspecified;
 }
+
+constexpr nosMediaIOFrameRate GetFrameRateFromDisplayMode(BMDDisplayMode displayMode)
+{
+	switch (displayMode)
+	{
+	case bmdModeNTSC2398:
+	case bmdModeHD1080p2398:
+	case bmdMode2k2398:
+	case bmdMode2kDCI2398:
+	case bmdMode4K2160p2398:
+	case bmdMode4kDCI2398:
+	case bmdMode8K4320p2398:
+	case bmdMode8kDCI2398:
+		return NOS_MEDIAIO_FRAME_RATE_2398;
+
+	case bmdModeHD1080p24:
+	case bmdMode2k24:
+	case bmdMode2kDCI24:
+	case bmdMode4K2160p24:
+	case bmdMode4kDCI24:
+	case bmdMode8K4320p24:
+	case bmdMode8kDCI24:
+		return NOS_MEDIAIO_FRAME_RATE_24;
+
+	case bmdModePAL:
+	case bmdModePALp:
+	case bmdModeHD1080p25:
+	case bmdMode2k25:
+	case bmdMode2kDCI25:
+	case bmdMode4K2160p25:
+	case bmdMode4kDCI25:
+	case bmdMode8K4320p25:
+	case bmdMode8kDCI25:
+		return NOS_MEDIAIO_FRAME_RATE_25;
+
+	case bmdModeNTSC:
+	case bmdModeNTSCp:
+	case bmdModeHD1080p2997:
+	case bmdMode2kDCI2997:
+	case bmdMode4K2160p2997:
+	case bmdMode4kDCI2997:
+	case bmdMode8K4320p2997:
+	case bmdMode8kDCI2997:
+		return NOS_MEDIAIO_FRAME_RATE_2997;
+
+	case bmdModeHD1080p30:
+	case bmdMode2kDCI30:
+	case bmdMode4K2160p30:
+	case bmdMode4kDCI30:
+	case bmdMode8K4320p30:
+	case bmdMode8kDCI30:
+		return NOS_MEDIAIO_FRAME_RATE_30;
+
+	case bmdModeHD1080p4795:
+	case bmdMode2kDCI4795:
+	case bmdMode4K2160p4795:
+	case bmdMode4kDCI4795:
+	case bmdMode8K4320p4795:
+	case bmdMode8kDCI4795:
+		return NOS_MEDIAIO_FRAME_RATE_4795;
+
+	case bmdModeHD1080p48:
+	case bmdMode2kDCI48:
+	case bmdMode4K2160p48:
+	case bmdMode4kDCI48:
+	case bmdMode8K4320p48:
+	case bmdMode8kDCI48:
+		return NOS_MEDIAIO_FRAME_RATE_48;
+
+	case bmdModeHD1080p50:
+	case bmdModeHD1080i50:
+	case bmdModeHD720p50:
+	case bmdMode2kDCI50:
+	case bmdMode4K2160p50:
+	case bmdMode4kDCI50:
+	case bmdMode8K4320p50:
+	case bmdMode8kDCI50:
+		return NOS_MEDIAIO_FRAME_RATE_50;
+
+	case bmdModeHD1080p5994:
+	case bmdModeHD1080i5994:
+	case bmdModeHD720p5994:
+	case bmdMode2kDCI5994:
+	case bmdMode4K2160p5994:
+	case bmdMode4kDCI5994:
+	case bmdMode8K4320p5994:
+	case bmdMode8kDCI5994:
+		return NOS_MEDIAIO_FRAME_RATE_5994;
+
+	case bmdModeHD1080p6000:
+	case bmdModeHD1080i6000:
+	case bmdModeHD720p60:
+	case bmdMode2kDCI60:
+	case bmdMode4K2160p60:
+	case bmdMode4kDCI60:
+	case bmdMode8K4320p60:
+		return NOS_MEDIAIO_FRAME_RATE_60;
+
+	case bmdModeHD1080p9590:
+	case bmdMode2kDCI9590:
+	case bmdMode4K2160p9590:
+		return NOS_MEDIAIO_FRAME_RATE_9590;
+
+	case bmdModeHD1080p96:
+	case bmdMode2kDCI96:
+	case bmdMode4K2160p96:
+		return NOS_MEDIAIO_FRAME_RATE_96;
+
+	case bmdModeHD1080p100:
+	case bmdMode2kDCI100:
+	case bmdMode4K2160p100:
+		return NOS_MEDIAIO_FRAME_RATE_100;
+
+	case bmdModeHD1080p11988:
+	case bmdMode2kDCI11988:
+	case bmdMode4K2160p11988:
+		return NOS_MEDIAIO_FRAME_RATE_11988;
+
+	case bmdModeHD1080p120:
+	case bmdMode2kDCI120:
+	case bmdMode4K2160p120:
+		return NOS_MEDIAIO_FRAME_RATE_120;
+
+	default:
+		return NOS_MEDIAIO_FRAME_RATE_INVALID;
+	}
+}
+
 }
