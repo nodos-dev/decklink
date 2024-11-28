@@ -30,7 +30,12 @@ nosResult NOSAPI_CALL UnloadSubsystem()
 	return NOS_RESULT_SUCCESS;
 }
 
-const char* NOSAPI_CALL GetChannelName(nosDeckLinkChannel channel);
+const char* NOSAPI_CALL GetChannelName(nosDeckLinkChannel channel)
+{
+	if (channel < NOS_DECKLINK_CHANNEL_MIN || channel > NOS_DECKLINK_CHANNEL_MAX)
+		return NOS_DECKLINK_CHANNEL_NAMES[NOS_DECKLINK_CHANNEL_INVALID];
+	return NOS_DECKLINK_CHANNEL_NAMES[channel];
+}
 
 namespace internal
 {
@@ -89,13 +94,6 @@ nosResult NOSAPI_CALL GetAvailableChannels(uint32_t deviceIndex, nosMediaIODirec
 		outChannels->Channels[i] = availableChannels[i];
 	}
 	return NOS_RESULT_SUCCESS;
-}
-
-const char* NOSAPI_CALL GetChannelName(nosDeckLinkChannel channel)
-{
-	if (channel < NOS_DECKLINK_CHANNEL_INVALID || channel > NOS_DECKLINK_CHANNEL_SINGLE_LINK_8)
-		return NOS_DECKLINK_CHANNEL_NAMES[0];
-	return NOS_DECKLINK_CHANNEL_NAMES[channel];
 }
 
 nosDeckLinkChannel NOSAPI_CALL GetChannelByName(const char* channelName)
@@ -165,12 +163,15 @@ nosResult NOSAPI_CALL GetSupportedOutputFrameRatesForGeometry(uint32_t deviceInd
 
 nosResult NOSAPI_CALL OpenChannel(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params)
 {
-	auto* subDevice = internal::GetSubDevice(deviceIndex, params->Direction, params->Channel);
-	if (!subDevice)
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
 		return NOS_RESULT_NOT_FOUND;
+	}
 	if (params->Direction == NOS_MEDIAIO_DIRECTION_OUTPUT)
 	{
-		if (!subDevice->OpenOutput(GetDeckLinkDisplayMode(params->Output.Geometry, params->Output.FrameRate), GetDeckLinkPixelFormat(params->PixelFormat)))
+		if (!device->OpenOutput(params->Channel, GetDeckLinkDisplayMode(params->Output.Geometry, params->Output.FrameRate), GetDeckLinkPixelFormat(params->PixelFormat)))
 		{
 			nosEngine.LogE("Failed to open output for channel %s", GetChannelName(params->Channel));
 			return NOS_RESULT_FAILED;
@@ -178,7 +179,7 @@ nosResult NOSAPI_CALL OpenChannel(uint32_t deviceIndex, nosDeckLinkOpenChannelPa
 	}
 	else
 	{
-		if (!subDevice->OpenInput(GetDeckLinkPixelFormat(params->PixelFormat)))
+		if (!device->OpenInput(params->Channel, GetDeckLinkPixelFormat(params->PixelFormat)))
 		{
 			nosEngine.LogE("Failed to open input for channel %s", GetChannelName(params->Channel));
 			return NOS_RESULT_FAILED;
@@ -189,68 +190,68 @@ nosResult NOSAPI_CALL OpenChannel(uint32_t deviceIndex, nosDeckLinkOpenChannelPa
 
 nosResult NOSAPI_CALL CloseChannel(uint32_t deviceIndex, nosDeckLinkChannel channel)
 {
-	auto* inputSubDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_INPUT, channel);
-	if (inputSubDevice)
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
 	{
-		if (inputSubDevice->IsBusyWith(NOS_MEDIAIO_DIRECTION_INPUT))
-		{
-			if (!inputSubDevice->CloseInput())
-				return NOS_RESULT_FAILED;
-			return NOS_RESULT_SUCCESS;
-		}
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
 	}
-	auto* outputSubDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
-	if (outputSubDevice)
+	if (!device->CloseChannel(channel))
 	{
-		if (outputSubDevice->IsBusyWith(NOS_MEDIAIO_DIRECTION_OUTPUT))
-		{
-			if (!outputSubDevice->CloseOutput())
-				return NOS_RESULT_FAILED;
-			return NOS_RESULT_SUCCESS;
-		}
+		nosEngine.LogE("Failed to close channel %s", GetChannelName(channel));
+		return NOS_RESULT_FAILED;
 	}
-	return NOS_RESULT_NOT_FOUND;
+	return NOS_RESULT_SUCCESS;
 }
 
 nosResult NOSAPI_CALL GetCurrentDeltaSecondsOfChannel(uint32_t deviceIndex, nosDeckLinkChannel channel, nosVec2u* outDeltaSeconds)
 {
-	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel); // TODO: Not only output
-	if (!subDevice)
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
 		return NOS_RESULT_NOT_FOUND;
-	*outDeltaSeconds = subDevice->GetDeltaSeconds();
+	}
+	auto deltaSeconds = device->GetCurrentDeltaSecondsOfChannel(channel);
+	if (!deltaSeconds)
+	{
+		nosEngine.LogE("Failed to get delta seconds for channel %s", GetChannelName(channel));
+		return NOS_RESULT_FAILED;
+	}
+	*outDeltaSeconds = *deltaSeconds;
 	return NOS_RESULT_SUCCESS;
 }
 
 nosResult NOSAPI_CALL WaitFrame(uint32_t deviceIndex, nosDeckLinkChannel channel, uint32_t timeoutMs)
 {
-	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
-	if (!subDevice)
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
 		return NOS_RESULT_NOT_FOUND;
-	subDevice->WaitFrame(std::chrono::milliseconds(timeoutMs));
+	}
+	if (!device->WaitFrame(channel, std::chrono::milliseconds(timeoutMs)))
+	{
+		nosEngine.LogE("Failed to wait frame for channel %s", GetChannelName(channel));
+		return NOS_RESULT_FAILED;
+	}
 	return NOS_RESULT_SUCCESS;
 }
 
-nosResult NOSAPI_CALL DMAWrite(uint32_t deviceIndex, nosDeckLinkChannel channel, const void* data, size_t size)
+nosResult NOSAPI_CALL DMATransfer(uint32_t deviceIndex, nosDeckLinkChannel channel, void* data, size_t size)
 {
-	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
-	if (!subDevice)
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
 		return NOS_RESULT_NOT_FOUND;
-	subDevice->DmaWrite(data, size);
+	}
+	if (!device->DmaTransfer(channel, data, size))
+	{
+		nosEngine.LogE("Failed to wait frame for channel %s", GetChannelName(channel));
+		return NOS_RESULT_FAILED;
+	}
 	return NOS_RESULT_SUCCESS;
-}
-
-nosResult NOSAPI_CALL ScheduleNextFrame(uint32_t deviceIndex, nosDeckLinkChannel channel)
-{
-	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
-	if (!subDevice)
-		return NOS_RESULT_NOT_FOUND;
-	subDevice->ScheduleNextFrame();
-	return NOS_RESULT_SUCCESS;
-}
-
-nosResult NOSAPI_CALL DMARead(uint32_t deviceIndex, nosDeckLinkChannel channel, void* outData, size_t size)
-{
-	return NOS_RESULT_NOT_IMPLEMENTED;
 }
 
 nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
@@ -273,9 +274,7 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->CloseChannel = CloseChannel;
 	subsystem->GetCurrentDeltaSecondsOfChannel = GetCurrentDeltaSecondsOfChannel;
 	subsystem->WaitFrame = WaitFrame;
-	subsystem->DMAWrite = DMAWrite;
-	subsystem->ScheduleNextFrame = ScheduleNextFrame;
-	subsystem->DMARead = DMARead;
+	subsystem->DMATransfer = DMATransfer;
 	*outSubsystemContext = subsystem;
 	GExportedSubsystemVersions[minorVersion] = subsystem;
 	return NOS_RESULT_SUCCESS;

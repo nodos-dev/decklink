@@ -129,7 +129,9 @@ public:
 				Channel.Open();
 		});
 		AddPinValueWatcher(NSN_IsInput, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
-			
+			auto newValue = *InterpretPinValue<bool>(newVal) ? NOS_MEDIAIO_DIRECTION_INPUT : NOS_MEDIAIO_DIRECTION_OUTPUT;
+			Channel.Update<&ChannelHandler::Direction>(newValue);
+			UpdateAfter(ChangedPinType::IsInput, !oldValue);
 		});
 		AddPinValueWatcher(NSN_Device, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			DevicePinValue = InterpretPinValue<const char>(newVal);

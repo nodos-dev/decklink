@@ -21,7 +21,7 @@ namespace nos::decklink
 enum class Nodes : int
 {
 	DMAWrite,
-	// DMARead,
+	DMARead,
 	WaitFrame,
 	Channel,
 	Count
@@ -44,7 +44,7 @@ struct DeckLinkPluginFunctions : nos::PluginFunctions
 		NOS_RETURN_ON_FAILURE(RegisterDMAWriteNode(outList[(int)Nodes::DMAWrite]))
 		NOS_RETURN_ON_FAILURE(RegisterWaitFrameNode(outList[(int)Nodes::WaitFrame]))
 		NOS_RETURN_ON_FAILURE(RegisterChannelNode(outList[(int)Nodes::Channel]))
-		// NOS_RETURN_ON_FAILURE(RegisterDMAReadNode(outList[(int)Nodes::DMARead]))
+		NOS_RETURN_ON_FAILURE(RegisterDMAReadNode(outList[(int)Nodes::DMARead]))
 		return NOS_RESULT_SUCCESS;
 	}
 };

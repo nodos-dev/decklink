@@ -40,6 +40,7 @@
 	},
 	"node_definitions": [
 		"Config/DMAWrite.nosdef",
+		"Config/DMARead.nosdef",
 		"Config/WaitFrame.nosdef",
 		"Config/Channel.nosdef",
 		"Config/OutputNode.nosdef"
@@ -53,6 +54,11 @@
 			"category": "Device|DeckLink",
 			"class_name": "DMAWrite",
 			"display_name": "DMA Write"
+		},
+		{
+			"category": "Device|DeckLink",
+			"class_name": "DMARead",
+			"display_name": "DMA Read"
 		},
 		{
 			"category": "Device|DeckLink",

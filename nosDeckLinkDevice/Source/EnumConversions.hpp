@@ -4,6 +4,7 @@
 
 #include <DeckLinkAPI.h>
 #include <nosMediaIO/nosMediaIO.h>
+#include <nosDeckLinkDevice/nosDeckLinkDevice.h>
 
 namespace nos::decklink
 {
@@ -412,4 +413,5 @@ constexpr nosMediaIOFrameRate GetFrameRateFromDisplayMode(BMDDisplayMode display
 	}
 }
 
+const char* NOSAPI_CALL GetChannelName(nosDeckLinkChannel channel);
 }

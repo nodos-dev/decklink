@@ -29,7 +29,7 @@ struct WaitFrameNode : NodeContext
 		auto channel = static_cast<nosDeckLinkChannel>(channelId->channel_index());
 		{
 			util::Stopwatch sw;
-			nosDeckLink->WaitFrame(deviceIndex, channel, 1000);
+			nosDeckLink->WaitFrame(deviceIndex, channel, 100);
 			auto elapsed = sw.ElapsedString();
 			char log[256];
 			snprintf(log, sizeof(log), "DeckLink %d:%d WaitFrame", deviceIndex, channel);

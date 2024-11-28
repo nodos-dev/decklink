@@ -23,6 +23,7 @@ typedef struct nosDeckLinkDeviceDesc {
 typedef enum nosDeckLinkChannel
 {
 	NOS_DECKLINK_CHANNEL_INVALID,
+	NOS_DECKLINK_CHANNEL_MIN = NOS_DECKLINK_CHANNEL_INVALID,
 	NOS_DECKLINK_CHANNEL_SINGLE_LINK_1,
 	NOS_DECKLINK_CHANNEL_SINGLE_LINK_2,
 	NOS_DECKLINK_CHANNEL_SINGLE_LINK_3,
@@ -81,9 +82,7 @@ typedef struct nosDeckLinkSubsystem {
 
 	// I/O
 	nosResult (NOSAPI_CALL* WaitFrame)(uint32_t deviceIndex, nosDeckLinkChannel channel, uint32_t timeoutMs);
-	nosResult (NOSAPI_CALL* DMAWrite)(uint32_t deviceIndex, nosDeckLinkChannel channel, const void* data, size_t size);
-	nosResult (NOSAPI_CALL* ScheduleNextFrame)(uint32_t deviceIndex, nosDeckLinkChannel channel);
-	nosResult (NOSAPI_CALL* DMARead)(uint32_t deviceIndex, nosDeckLinkChannel channel, void* outData, size_t size);
+	nosResult (NOSAPI_CALL* DMATransfer)(uint32_t deviceIndex, nosDeckLinkChannel channel, void* data, size_t size);
 } nosDeckLinkSubsystem;
 
 #pragma region Helper Declarations & Macros
