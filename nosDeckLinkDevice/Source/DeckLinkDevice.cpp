@@ -378,9 +378,41 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 	return true;
 }
 
+bool SubDevice::CloseOutput()
+{
+	if (!Output)
+	{
+		nosEngine.LogE("SubDevice: Output interface is not available for device: %s", ModelName.c_str());
+		return false;
+	}
+	if (!ActiveModes[NOS_MEDIAIO_DIRECTION_OUTPUT])
+	{
+		nosEngine.LogE("SubDevice: Output is not active for device: %s", ModelName.c_str());
+		return false;
+	}
+
+	if (Output->StopScheduledPlayback(0, nullptr, TimeScale) != S_OK)
+	{
+		nosEngine.LogE("Failed to stop scheduled playback for device: %s", ModelName.c_str());
+	}
+
+	auto res = Output->DisableVideoOutput();
+	if (FAILED(res))
+	{
+		nosEngine.LogE("SubDevice: Failed to disable video output for device: %s", ModelName.c_str());
+		return false;
+	}
+	return true;
+}
+
 bool SubDevice::OpenInput(BMDPixelFormat pixelFormat)
 {
-	
+	nosEngine.LogE("Unimplemented");
+	return false;
+}
+
+bool SubDevice::CloseInput()
+{
 	nosEngine.LogE("Unimplemented");
 	return false;
 }

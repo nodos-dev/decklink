@@ -2,6 +2,8 @@
 #include <Nodos/SubsystemAPI.h>
 #include <Nodos/Name.hpp>
 
+#include "EnumConversions.hpp"
+
 
 NOS_INIT_WITH_MIN_REQUIRED_MINOR(0); // APITransition: Reminder that this should be reset after next major!
 
@@ -164,12 +166,66 @@ nosResult NOSAPI_CALL CanOpenChannel(uint32_t deviceIndex, nosDeckLinkOpenChanne
 
 nosResult NOSAPI_CALL OpenChannel(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params)
 {
-	return NOS_RESULT_NOT_IMPLEMENTED;
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	auto* subDevice = device->GetSubDeviceOfChannel(params->Direction, params->Channel);
+	if (!subDevice)
+	{
+		nosEngine.LogE("No such sub-device for channel %s", GetChannelName(params->Channel));
+		return NOS_RESULT_NOT_FOUND;
+	}
+	if (params->Direction == NOS_MEDIAIO_DIRECTION_OUTPUT)
+	{
+		if (!subDevice->OpenOutput(GetDeckLinkDisplayMode(params->Output.Geometry, params->Output.FrameRate), GetDeckLinkPixelFormat(params->PixelFormat)))
+		{
+			nosEngine.LogE("Failed to open output for channel %s", GetChannelName(params->Channel));
+			return NOS_RESULT_FAILED;
+		}
+	}
+	else
+	{
+		if (!subDevice->OpenInput(GetDeckLinkPixelFormat(params->PixelFormat)))
+		{
+			nosEngine.LogE("Failed to open input for channel %s", GetChannelName(params->Channel));
+			return NOS_RESULT_FAILED;
+		}
+	}
+	return NOS_RESULT_SUCCESS;
 }
 
 nosResult NOSAPI_CALL CloseChannel(uint32_t deviceIndex, nosDeckLinkChannel channel)
 {
-	return NOS_RESULT_NOT_IMPLEMENTED;
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	auto* inputSubDevice = device->GetSubDeviceOfChannel(NOS_MEDIAIO_DIRECTION_INPUT, channel);
+	if (inputSubDevice)
+	{
+		if (inputSubDevice->IsBusyWith(NOS_MEDIAIO_DIRECTION_INPUT))
+		{
+			if (!inputSubDevice->CloseInput())
+				return NOS_RESULT_FAILED;
+			return NOS_RESULT_SUCCESS;
+		}
+	}
+	auto* outputSubDevice = device->GetSubDeviceOfChannel(NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
+	if (outputSubDevice)
+	{
+		if (outputSubDevice->IsBusyWith(NOS_MEDIAIO_DIRECTION_OUTPUT))
+		{
+			if (!outputSubDevice->CloseOutput())
+				return NOS_RESULT_FAILED;
+			return NOS_RESULT_SUCCESS;
+		}
+	}
+	return NOS_RESULT_NOT_FOUND;
 }
 
 nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)

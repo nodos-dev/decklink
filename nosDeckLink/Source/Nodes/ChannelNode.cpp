@@ -3,6 +3,8 @@
 
 #include <nosDeckLinkDevice/nosDeckLinkDevice.h>
 
+#include "Generated/DeckLink_generated.h"
+
 namespace nos::decklink
 {
 
@@ -12,6 +14,7 @@ NOS_REGISTER_NAME(IsInput);
 NOS_REGISTER_NAME(Resolution);
 NOS_REGISTER_NAME(FrameRate);
 NOS_REGISTER_NAME(IsOpen);
+NOS_REGISTER_NAME(ChannelId);
 
 enum class ChangedPinType
 {
@@ -22,6 +25,73 @@ enum class ChangedPinType
 	FrameRate
 };
 
+enum class ChannelUpdateResult
+{
+	NothingChanged,
+	NeedsRescan,
+	Opened,
+};
+	
+struct ChannelHandler
+{
+	bool IsOpen = false;
+	nosUUID OutChannelPinId;
+	int32_t DeviceIndex = -1;
+	nosMediaIODirection Direction = NOS_MEDIAIO_DIRECTION_OUTPUT;
+	nosDeckLinkChannel Channel = NOS_DECKLINK_CHANNEL_INVALID;
+	nosMediaIOFrameGeometry Resolution = NOS_MEDIAIO_FG_INVALID;
+	nosMediaIOFrameRate FrameRate = NOS_MEDIAIO_FRAME_RATE_INVALID;
+
+	template<auto Member, typename T>
+	ChannelUpdateResult Update(const T& value)
+	{
+		if (this->*Member == value)
+			return ChannelUpdateResult::NothingChanged;
+		if (IsOpen)
+			Close();
+		this->*Member = value;
+		if (!Open())
+			return ChannelUpdateResult::NeedsRescan;
+		return ChannelUpdateResult::Opened;
+	}
+	
+	void Close()
+	{
+		nosDeckLink->CloseChannel(DeviceIndex, Channel);
+		IsOpen = false;
+		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId{}));
+	}
+	
+	bool Open()
+	{
+		if (DeviceIndex == -1)
+			return false;
+		if (Channel == NOS_DECKLINK_CHANNEL_INVALID)
+			return false;
+		if (IsOpen)
+			return true;
+		nosDeckLinkOpenChannelParams params {
+			.Direction = Direction,
+			.Channel = Channel,
+			.PixelFormat = NOS_MEDIAIO_PIXEL_FORMAT_YCBCR_8BIT,
+			.Output = {}
+		};
+		if (Direction == NOS_MEDIAIO_DIRECTION_OUTPUT)
+		{
+			params.Output.Geometry = Resolution;
+			params.Output.FrameRate = FrameRate;
+		}
+		auto res = nosDeckLink->OpenChannel(DeviceIndex, &params);
+		if (res != NOS_RESULT_SUCCESS)
+			return false;
+		IsOpen = true;
+		ChannelId id(DeviceIndex, Channel, Direction);
+		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(id));
+		return true;
+	}
+};
+
+	
 class ChannelNode : public nos::NodeContext
 {
 public:
@@ -32,86 +102,87 @@ public:
 		SetPinVisualizer(NSN_Resolution, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetResolutionStringListName()});
 		SetPinVisualizer(NSN_FrameRate, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetFrameRateStringListName()});
 
+    	Channel.OutChannelPinId = *GetPinId(NSN_ChannelId);
+
 		UpdateStringList(GetDeviceStringListName(), GetPossibleDeviceNames());
 
 		AddPinValueWatcher(NSN_IsOpen, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			ShouldOpen = *InterpretPinValue<bool>(newVal);
-			TryUpdateChannel();
 		});
 		AddPinValueWatcher(NSN_IsInput, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
-
+			
 		});
 		AddPinValueWatcher(NSN_Device, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			DevicePinValue = InterpretPinValue<const char>(newVal);
-			auto oldDevice = CurrentChannel.DeviceIndex;
 			uint32_t newDeviceIndex = 0;
 			if (NOS_RESULT_SUCCESS != nosDeckLink->GetDeviceByUniqueDisplayName(DevicePinValue.c_str(), &newDeviceIndex))
+				newDeviceIndex = -1;
+			if (ChannelUpdateResult::NeedsRescan == Channel.Update<&ChannelHandler::DeviceIndex>(newDeviceIndex))
 			{
-				// TODO: Close if open
-				CurrentChannel.DeviceIndex = -1;
+				if (DevicePinValue != "NONE" && Channel.DeviceIndex == -1)
+					SetPinValue(NSN_Device, nosBuffer{.Data = (void*)"NONE", .Size = 5});
+				else
+				{
+					if (oldValue)
+						ResetAfter(ChangedPinType::Device);
+					else if (DevicePinValue == "NONE")
+						AutoSelectIfSingle(NSN_Device, GetPossibleDeviceNames());
+				}
+				UpdateAfter(ChangedPinType::Device, !oldValue);
 			}
-			else
-				CurrentChannel.DeviceIndex = newDeviceIndex;
-			if (DevicePinValue != "NONE" && CurrentChannel.DeviceIndex == -1)
-				SetPinValue(NSN_Device, nosBuffer{.Data = (void*)"NONE", .Size = 5});
-			else
-			{
-				if (oldValue)
-					ResetAfter(ChangedPinType::Device);
-				else if (DevicePinValue == "NONE")
-					AutoSelectIfSingle(NSN_Device, GetPossibleDeviceNames());
-			}
-			UpdateAfter(ChangedPinType::Device, !oldValue);
 		});
 		AddPinValueWatcher(NSN_ChannelName, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			ChannelPinValue = InterpretPinValue<const char>(newVal);
 			auto newChannel = nosDeckLink->GetChannelByName(ChannelPinValue.c_str());
-			if (CurrentChannel.Channel != newChannel)
+			if (ChannelUpdateResult::NeedsRescan == Channel.Update<&ChannelHandler::Channel>(newChannel))
 			{
-				// todo: close if open
+				if (ChannelPinValue != "NONE" && newChannel == NOS_DECKLINK_CHANNEL_INVALID)
+					SetPinValue(NSN_ChannelName, nosBuffer{.Data = (void*)"NONE", .Size = 5});
+				else
+				{
+					if (oldValue)
+						ResetAfter(ChangedPinType::ChannelName);
+					else if (ChannelPinValue == "NONE")
+						AutoSelectIfSingle(NSN_ChannelName, GetPossibleChannelNames());
+				}
+				UpdateAfter(ChangedPinType::ChannelName, !oldValue);
 			}
-			CurrentChannel.Channel = newChannel;
-			if (ChannelPinValue != "NONE" && newChannel == NOS_DECKLINK_CHANNEL_INVALID)
-				SetPinValue(NSN_ChannelName, nosBuffer{.Data = (void*)"NONE", .Size = 5});
-			else
-			{
-				if (oldValue)
-					ResetAfter(ChangedPinType::ChannelName);
-				else if (ChannelPinValue == "NONE")
-					AutoSelectIfSingle(NSN_ChannelName, GetPossibleChannelNames());
-			}
-			UpdateAfter(ChangedPinType::ChannelName, !oldValue);
+			
 		});
 		AddPinValueWatcher(NSN_Resolution, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			ResolutionPinValue = InterpretPinValue<const char>(newVal);
 			auto newResolution = nosMediaIO->GetFrameGeometryFromString(ResolutionPinValue.c_str());
-			if (CurrentChannel.Resolution != newResolution)
+			if (ChannelUpdateResult::NeedsRescan == Channel.Update<&ChannelHandler::Resolution>(newResolution))
 			{
-				// todo: close if open
+				if (ResolutionPinValue != "NONE" && newResolution == NOS_MEDIAIO_FG_INVALID)
+					SetPinValue(NSN_Resolution, nosBuffer{.Data = (void*)"NONE", .Size = 5});
+				else
+				{
+					if (oldValue)
+						ResetAfter(ChangedPinType::Resolution);
+					else if (ResolutionPinValue == "NONE")
+						AutoSelectIfSingle(NSN_Resolution, GetPossibleResolutions());
+				}
+				UpdateAfter(ChangedPinType::Resolution, !oldValue);
 			}
-			CurrentChannel.Resolution = newResolution;
-			if (ResolutionPinValue != "NONE" && newResolution == NOS_MEDIAIO_FG_INVALID)
-				SetPinValue(NSN_Resolution, nosBuffer{.Data = (void*)"NONE", .Size = 5});
-			else
-			{
-				if (oldValue)
-					ResetAfter(ChangedPinType::Resolution);
-				else if (ResolutionPinValue == "NONE")
-					AutoSelectIfSingle(NSN_Resolution, GetPossibleResolutions());
-			}
-			UpdateAfter(ChangedPinType::Resolution, !oldValue);
 		});
 		AddPinValueWatcher(NSN_FrameRate, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
-			
+			FrameRatePinValue = InterpretPinValue<const char>(newVal);
+			auto newFrameRate = nosMediaIO->GetFrameRateFromString(FrameRatePinValue.c_str());
+			if (ChannelUpdateResult::NeedsRescan == Channel.Update<&ChannelHandler::FrameRate>(newFrameRate))
+			{
+				if (FrameRatePinValue != "NONE" && newFrameRate == NOS_MEDIAIO_FRAME_RATE_INVALID)
+					SetPinValue(NSN_FrameRate, nosBuffer{.Data = (void*)"NONE", .Size = 5});
+				else
+				{
+					if (oldValue)
+						ResetAfter(ChangedPinType::FrameRate);
+					else if (FrameRatePinValue == "NONE")
+						AutoSelectIfSingle(NSN_FrameRate, GetPossibleFrameRates());
+				}
+				UpdateAfter(ChangedPinType::FrameRate, !oldValue);
+			}
 		});
-    }
-
-	void TryUpdateChannel()
-    {
-    	if (!ShouldOpen)
-    	{
-    		return;
-    	}
     }
 
 	void AutoSelectIfSingle(nosName pinName, std::vector<std::string> const& list)
@@ -226,10 +297,10 @@ public:
 	std::vector<std::string> GetPossibleChannelNames() 
 	{
 		std::vector<std::string> channels = {"NONE"};
-    	if (CurrentChannel.DeviceIndex == -1)
+    	if (Channel.DeviceIndex == -1)
     		return channels;
     	nosDeckLinkChannelList channelList{};
-    	nosDeckLink->GetAvailableChannels(CurrentChannel.DeviceIndex, IsInput ? NOS_MEDIAIO_DIRECTION_INPUT : NOS_MEDIAIO_DIRECTION_OUTPUT, &channelList);
+    	nosDeckLink->GetAvailableChannels(Channel.DeviceIndex, IsInput ? NOS_MEDIAIO_DIRECTION_INPUT : NOS_MEDIAIO_DIRECTION_OUTPUT, &channelList);
     	for (size_t i = 0; i < channelList.Count; i++)
 		{
 			auto channelName = nosDeckLink->GetChannelName(channelList.Channels[i]);
@@ -241,10 +312,10 @@ public:
 	std::vector<std::string> GetPossibleResolutions() 
 	{
 		std::vector<std::string> possibleResolutions = {"NONE"};
-    	if (CurrentChannel.Channel == NOS_DECKLINK_CHANNEL_INVALID)
+    	if (Channel.DeviceIndex == -1 || Channel.Channel == NOS_DECKLINK_CHANNEL_INVALID)
 			return possibleResolutions;
     	nosMediaIOFrameGeometryList frameGeometryList{};
-    	nosDeckLink->GetSupportedOutputFrameGeometries(CurrentChannel.DeviceIndex, CurrentChannel.Channel, &frameGeometryList);
+    	nosDeckLink->GetSupportedOutputFrameGeometries(Channel.DeviceIndex, Channel.Channel, &frameGeometryList);
     	for (size_t i = 0; i < frameGeometryList.Count; i++)
     	{
     		auto& fg = frameGeometryList.Geometries[i];
@@ -257,10 +328,10 @@ public:
 	std::vector<std::string> GetPossibleFrameRates() 
 	{
 		std::vector<std::string> possibleFrameRates = {"NONE"};
-    	if (CurrentChannel.Channel == NOS_DECKLINK_CHANNEL_INVALID || CurrentChannel.Resolution == NOS_MEDIAIO_FG_INVALID)
+    	if (Channel.DeviceIndex == -1 || Channel.Channel == NOS_DECKLINK_CHANNEL_INVALID || Channel.Resolution == NOS_MEDIAIO_FG_INVALID)
     		return possibleFrameRates;
     	nosMediaIOFrameRateList frameRates{};
-    	nosDeckLink->GetSupportedOutputFrameRatesForGeometry(CurrentChannel.DeviceIndex, CurrentChannel.Channel, CurrentChannel.Resolution, &frameRates);
+    	nosDeckLink->GetSupportedOutputFrameRatesForGeometry(Channel.DeviceIndex, Channel.Channel, Channel.Resolution, &frameRates);
     	for (size_t i = 0; i < frameRates.Count; i++)
 		{
 			auto& rate = frameRates.FrameRates[i];
@@ -277,14 +348,7 @@ public:
 	std::string ResolutionPinValue = "NONE";
 	std::string FrameRatePinValue = "NONE";
 
-	struct
-	{
-		int32_t DeviceIndex = -1;
-		bool IsOpen = false;
-		nosDeckLinkChannel Channel = NOS_DECKLINK_CHANNEL_INVALID;
-		nosMediaIOFrameGeometry Resolution = NOS_MEDIAIO_FG_INVALID;
-		nosMediaIOFrameRate FrameRate = NOS_MEDIAIO_FRAME_RATE_INVALID;
-	} CurrentChannel;
+	ChannelHandler Channel;
 };
 
 nosResult RegisterChannelNode(nosNodeFunctions* funcs)

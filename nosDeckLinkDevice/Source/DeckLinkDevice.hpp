@@ -42,12 +42,14 @@ public:
 	// Output
 	bool DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
 	bool OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
+	bool CloseOutput();
 	bool WaitFrameCompletion();
 	void ScheduleNextFrame();
 	void DmaWrite(void* buffer, size_t size);
 	nosVec2u GetDeltaSeconds() const;
 	
 	bool OpenInput(BMDPixelFormat pixelFormat);
+	bool CloseInput();
 
 	IDeckLinkProfileManager* ProfileManager = nullptr;
 protected:
