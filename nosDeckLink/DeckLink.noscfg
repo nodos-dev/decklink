@@ -41,7 +41,8 @@
 	"node_definitions": [
 		"Config/DMAWrite.nosdef",
 		"Config/WaitFrame.nosdef",
-		"Config/Channel.nosdef"
+		"Config/Channel.nosdef",
+		"Config/OutputNode.nosdef"
 	],
 	"custom_types": [
 		"Config/DeckLink.fbs"
@@ -62,6 +63,11 @@
 			"category": "Device|DeckLink",
 			"class_name": "Channel",
 			"display_name": "Channel"
+		},
+		{
+			"category": "Device|DeckLink",
+			"class_name": "Output",
+			"display_name": "DeckLink Out"
 		}
 	],
 	"third_party_software": []
