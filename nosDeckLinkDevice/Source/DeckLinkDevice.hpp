@@ -43,9 +43,9 @@ public:
 	bool DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
 	bool OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
 	bool CloseOutput();
-	bool WaitFrameCompletion();
+	bool WaitFrame(std::chrono::milliseconds timeout);
 	void ScheduleNextFrame();
-	void DmaWrite(void* buffer, size_t size);
+	void DmaWrite(const void* buffer, size_t size);
 	nosVec2u GetDeltaSeconds() const;
 	
 	bool OpenInput(BMDPixelFormat pixelFormat);

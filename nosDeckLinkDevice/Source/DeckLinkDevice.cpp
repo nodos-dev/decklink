@@ -417,10 +417,10 @@ bool SubDevice::CloseInput()
 	return false;
 }
 
-bool SubDevice::WaitFrameCompletion()
+bool SubDevice::WaitFrame(std::chrono::milliseconds timeout)
 {
 	std::unique_lock lock(VideoFramesMutex);
-	return FrameCompletionCondition.wait_for(lock, std::chrono::seconds(1), [this]()
+	return FrameCompletionCondition.wait_for(lock, timeout, [this]()
 	{
 		return !CompletedFramesQueue.empty();
 	});
@@ -430,17 +430,15 @@ void SubDevice::ScheduleNextFrame()
 {
 	IDeckLinkVideoFrame* frameToSchedule = VideoFrames[NextFrameToSchedule];
 	NextFrameToSchedule = ++NextFrameToSchedule % VideoFrames.size();
-
 	HRESULT result = Output->ScheduleVideoFrame(frameToSchedule, TotalFramesScheduled * FrameDuration, FrameDuration, TimeScale);
 	if (result != S_OK)
 	{
 		nosEngine.LogE("Failed to schedule video frame for device: %s", ModelName.c_str());
 	}
-
 	++TotalFramesScheduled;
 }
 
-void SubDevice::DmaWrite(void* buffer, size_t size)
+void SubDevice::DmaWrite(const void* buffer, size_t size)
 {
 	util::Stopwatch sw;
 	void* frameBytes = nullptr;

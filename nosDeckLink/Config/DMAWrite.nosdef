@@ -13,19 +13,18 @@
                     "can_show_as": "INPUT_PIN_ONLY"
                 },
                 {
+                    "name": "ChannelId",
+                    "type_name": "nos.decklink.ChannelId",
+                    "show_as": "INPUT_PIN",
+                    "can_show_as": "INPUT_PIN_ONLY"
+                },
+                {
                     "name": "FieldType",
                     "display_name": "Field Type",
                     "type_name": "nos.sys.vulkan.FieldType",
                     "show_as": "INPUT_PIN",
                     "can_show_as": "INPUT_PIN_OR_PROPERTY",
                     "data": "PROGRESSIVE"
-                },
-                {
-                    "name": "SubDeviceHandle",
-                    "type_name": "string",
-                    "show_as": "INPUT_PIN",
-                    "can_show_as": "INPUT_PIN_ONLY",
-                    "data": ""
                 },
                 {
                     "name": "Input",

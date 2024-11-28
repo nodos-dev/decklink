@@ -3,8 +3,11 @@
 
 #include <nosVulkanSubsystem/nosVulkanSubsystem.h>
 #include <nosVulkanSubsystem/Helpers.hpp>
+#include <nosDeckLinkDevice/nosDeckLinkDevice.h>
 
 #include <nosUtil/Stopwatch.hpp>
+
+#include "Generated/DeckLink_generated.h"
 
 namespace nos::decklink
 {
@@ -32,6 +35,7 @@ struct DMAWriteNode : NodeContext
 	{
 		nosResourceShareInfo inputBuffer{};
 		auto fieldType = nos::sys::vulkan::FieldType::UNKNOWN;
+		ChannelId* channelId = nullptr;
 		for (size_t i = 0; i < params->PinCount; ++i)
 		{
 			auto& pin = params->Pins[i];
@@ -39,14 +43,26 @@ struct DMAWriteNode : NodeContext
 				inputBuffer = vkss::ConvertToResourceInfo(*InterpretPinValue<sys::vulkan::Buffer>(*pin.Data));
 			if (pin.Name == NOS_NAME("FieldType"))
 				fieldType = *InterpretPinValue<sys::vulkan::FieldType>(*pin.Data);
+			if (pin.Name == NOS_NAME("ChannelId"))
+				channelId = InterpretPinValue<ChannelId>(*pin.Data);
 		}
+
+		auto deviceIndex = channelId->device_index();
+		auto channel = static_cast<nosDeckLinkChannel>(channelId->channel_index());
 
 		if (!inputBuffer.Memory.Handle)
 			return NOS_RESULT_FAILED;
 
 		auto buffer = nosVulkan->Map(&inputBuffer);
-		/*Device->DmaWrite(buffer, inputBuffer.Info.Buffer.Size);
-		Device->ScheduleNextFrame();*/
+		{
+			util::Stopwatch sw;
+			nosDeckLink->DMAWrite(deviceIndex, channel, buffer, inputBuffer.Info.Buffer.Size);
+			auto elapsed = sw.ElapsedString();
+			char log[256];
+			snprintf(log, sizeof(log), "DeckLink %d:%d DMAWrite", deviceIndex, channel);
+			nosEngine.WatchLog(log, elapsed.c_str());
+		}
+		nosDeckLink->ScheduleNextFrame(deviceIndex, channel);
 
 		nosScheduleNodeParams schedule {
 			.NodeId = NodeId,

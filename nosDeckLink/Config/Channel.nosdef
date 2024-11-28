@@ -25,6 +25,14 @@
                     "can_show_as": "OUTPUT_PIN_OR_PROPERTY"
                 },
                 {
+                    "name": "DeviceProfile",
+                    "display_name": "Device Profile",
+                    "type_name": "string",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY",
+                    "readonly": true
+                },
+                {
                     "name": "IsOpen",
                     "type_name": "bool",
                     "show_as": "PROPERTY",
@@ -35,13 +43,6 @@
                     "type_name": "bool",
                     "show_as": "PROPERTY",
                     "can_show_as": "PROPERTY_ONLY"
-                },
-                {
-                    "name": "Profile",
-                    "type_name": "string",
-                    "show_as": "PROPERTY",
-                    "can_show_as": "PROPERTY_ONLY",
-                    "readonly": true
                 },
                 {
                     "name": "Device",
@@ -71,6 +72,13 @@
                     "type_name": "string",
                     "show_as": "PROPERTY",
                     "can_show_as": "PROPERTY_ONLY"
+                },
+                {
+                    "name": "ChannelResolution",
+                    "display_name": "Channel Resolution",
+                    "type_name": "nos.fb.vec2u",
+                    "show_as": "OUTPUT_PIN",
+                    "can_show_as": "OUTPUT_PIN_OR_PROPERTY"
                 }
             ],
             "functions": [

@@ -3,6 +3,10 @@
 
 #include <nosUtil/Stopwatch.hpp>
 
+#include <nosDeckLinkDevice/nosDeckLinkDevice.h>
+
+#include "Generated/DeckLink_generated.h"
+
 namespace nos::decklink
 {
 	
@@ -14,18 +18,25 @@ struct WaitFrameNode : NodeContext
 
 	nosResult ExecuteNode(nosNodeExecuteParams* params) override
 	{
+		ChannelId* channelId = nullptr;
+		for (size_t i = 0; i < params->PinCount; ++i)
+		{
+			auto& pin = params->Pins[i];
+			if (pin.Name == NOS_NAME("ChannelId"))
+				channelId = InterpretPinValue<ChannelId>(*pin.Data);
+		}
+		auto deviceIndex = channelId->device_index();
+		auto channel = static_cast<nosDeckLinkChannel>(channelId->channel_index());
 		{
 			util::Stopwatch sw;
-			//Device->WaitFrameCompletion();
-			// nosEngine.WatchLog(("DeckLink " + Device->Handle + " Wait Time").c_str(), sw.ElapsedString().c_str());
+			nosDeckLink->WaitFrame(deviceIndex, channel, 1000);
+			auto elapsed = sw.ElapsedString();
+			char log[256];
+			snprintf(log, sizeof(log), "DeckLink %d:%d WaitFrame", deviceIndex, channel);
+			nosEngine.WatchLog(log, elapsed.c_str());
 		}
-
-		// nosEngine.SetPinValue(GetPin(NOS_NAME("SubDeviceHandle"))->Id,  nos::Buffer(Device->Handle.c_str(), Device->Handle.size() + 1));
-		
 		return NOS_RESULT_SUCCESS;
 	}
-
-	// SubDevice* Device = nullptr;
 };
 
 nosResult RegisterWaitFrameNode(nosNodeFunctions* functions)
