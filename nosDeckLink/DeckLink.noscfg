@@ -1,31 +1,31 @@
 {
-    "info": {
-        "id": {
-            "name": "nos.decklink",
-            "version": "1.0.0"
-        },
-        "display_name": "DeckLink",
-        "description": "Video I/O plugin for BlackMagic DeckLink cards.",
-        "dependencies": [
-            {
-              "name": "nos.sys.mediaio",
-              "version": "1.0.0"
-            },
-            {
-                "name": "nos.device.decklink",
-                "version": "1.0.0"
-            },
-            {
-              "name": "nos.sys.vulkan",
-              "version": "5.8.0"
-            },
-            {
-                "name": "nos.mediaio",
-                "version": "2.0.0"
-            },
+	"info": {
+		"id": {
+			"name": "nos.decklink",
+			"version": "1.0.0"
+		},
+		"display_name": "DeckLink",
+		"description": "Video I/O plugin for BlackMagic DeckLink cards.",
+		"dependencies": [
+			{
+				"name": "nos.sys.mediaio",
+				"version": "1.0.0"
+			},
+			{
+				"name": "nos.device.decklink",
+				"version": "1.0.0"
+			},
+			{
+				"name": "nos.sys.vulkan",
+				"version": "5.8.0"
+			},
+			{
+				"name": "nos.mediaio",
+				"version": "2.0.0"
+			},
 			{
 				"name": "nos.utilities",
-				"version": "2.9.0"
+				"version": "2.11.0"
 			},
 			{
 				"name": "nos.math",
@@ -35,34 +35,34 @@
 				"name": "nos.reflect",
 				"version": "1.1.0"
 			}
-        ],
-        "category": "Media I/O"
-    },
-    "node_definitions": [
-      "Config/DMAWrite.nosdef",
-      "Config/WaitFrame.nosdef",
-      "Config/Channel.nosdef"
-    ],
-    "custom_types" :[
-      "Config/DeckLink.fbs"
-    ],
-    "binary_path": "Binaries/nosDeckLink",
-    "associated_nodes": [
-      {
-        "category": "Device|DeckLink",
-        "class_name": "DMAWrite",
-        "display_name": "DMA Write"
-      },
-      {
-        "category": "Device|DeckLink",
-        "class_name": "WaitFrame",
-        "display_name": "Wait Frame"
-      },
-      {
-        "category": "Device|DeckLink",
-        "class_name": "Channel",
-        "display_name": "Channel"
-      }
-    ],
-    "third_party_software": []
+		],
+		"category": "Media I/O"
+	},
+	"node_definitions": [
+		"Config/DMAWrite.nosdef",
+		"Config/WaitFrame.nosdef",
+		"Config/Channel.nosdef"
+	],
+	"custom_types": [
+		"Config/DeckLink.fbs"
+	],
+	"binary_path": "Binaries/nosDeckLink",
+	"associated_nodes": [
+		{
+			"category": "Device|DeckLink",
+			"class_name": "DMAWrite",
+			"display_name": "DMA Write"
+		},
+		{
+			"category": "Device|DeckLink",
+			"class_name": "WaitFrame",
+			"display_name": "Wait Frame"
+		},
+		{
+			"category": "Device|DeckLink",
+			"class_name": "Channel",
+			"display_name": "Channel"
+		}
+	],
+	"third_party_software": []
 }

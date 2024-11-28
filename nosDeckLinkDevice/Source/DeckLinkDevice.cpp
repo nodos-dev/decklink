@@ -157,7 +157,7 @@ HRESULT	OutputCallback::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFr
 {
 	{
 		std::unique_lock lock(Output->VideoFramesMutex);
-		Output->CompletedFramesQueue.push_back(completedFrame);
+		Output->ReadyForWriteQueue.push_back(completedFrame);
 	}
 	Output->FrameCompletionCondition.notify_one();
 	if (result != bmdOutputFrameCompleted)
@@ -225,7 +225,7 @@ bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 			Interface->CreateVideoFrame(width, height, width * 2, pixelFormat, bmdFrameFlagDefault, &frame);
 			if (!frame)
 				return false;
-			CompletedFramesQueue.push_back(frame);
+			ReadyForWriteQueue.push_back(frame);
 		}
 	}
 
@@ -273,7 +273,9 @@ bool OutputHandler::Close()
 		std::unique_lock lock(VideoFramesMutex);
 		for (auto& frame : VideoFrames)
 			Release(frame);
-		CompletedFramesQueue.clear();
+		ReadyForWriteQueue.clear();
+		TotalFramesScheduled = 0;
+		NextFrameToSchedule = 0;
 	}
 	return true;
 }
@@ -283,7 +285,7 @@ bool OutputHandler::WaitFrame(std::chrono::milliseconds timeout)
 	std::unique_lock lock(VideoFramesMutex);
 	return FrameCompletionCondition.wait_for(lock, timeout, [this]()
 	{
-		return !CompletedFramesQueue.empty();
+		return !ReadyForWriteQueue.empty();
 	});
 }
 
@@ -303,12 +305,12 @@ void OutputHandler::DmaWrite(const void* buffer, size_t size)
 	size_t actualBufferSize = 0;
 	{
 		std::unique_lock lock (VideoFramesMutex);
-		if (CompletedFramesQueue.empty())
+		if (ReadyForWriteQueue.empty())
 			return;
-		auto frameBuffer = CompletedFramesQueue.front();
+		auto frameBuffer = ReadyForWriteQueue.front();
 		frameBuffer->GetBytes(&frameBytes);
 		actualBufferSize = frameBuffer->GetRowBytes() * frameBuffer->GetHeight();
-		CompletedFramesQueue.pop_front();
+		ReadyForWriteQueue.pop_front();
 	}
 	if (frameBytes && buffer)
 	{

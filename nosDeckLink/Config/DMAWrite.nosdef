@@ -26,17 +26,6 @@
                 }
             ],
             "functions": [
-                {
-                    "class_name": "Drop",
-                    "contents_type": "Job",
-                    "pins": [
-                        {
-                            "name": "Propagate",
-                            "type_name": "nos.exe",
-                            "show_as": "OUTPUT_PIN"
-                        }
-                    ]
-                }
             ]
         }
     ]

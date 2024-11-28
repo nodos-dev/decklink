@@ -32,7 +32,7 @@ struct OutputHandler
 	std::array<IDeckLinkMutableVideoFrame*, 4> VideoFrames{};
 	std::mutex VideoFramesMutex;
 	std::condition_variable FrameCompletionCondition;
-	std::deque<IDeckLinkVideoFrame*> CompletedFramesQueue;
+	std::deque<IDeckLinkVideoFrame*> ReadyForWriteQueue;
 	
 	uint32_t TotalFramesScheduled = 0;
 	uint32_t NextFrameToSchedule = 0;
