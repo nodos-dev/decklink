@@ -1,7 +1,6 @@
 namespace nos.decklink;
 
 struct ChannelId {
-	is_open: bool;
 	device_index: int;
 	channel_index: int;
 	is_input: bool;

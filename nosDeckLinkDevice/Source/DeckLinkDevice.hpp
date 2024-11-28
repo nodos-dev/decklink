@@ -21,6 +21,60 @@ namespace nos::decklink
 {
 std::vector<std::unique_ptr<class Device>> InitializeDevices();
 
+struct OutputHandler
+{
+	IDeckLinkOutput* Interface = nullptr;
+
+	bool IsActive = false;
+	BMDTimeValue FrameDuration = 0;
+	BMDTimeScale TimeScale = 0;
+	
+	std::array<IDeckLinkMutableVideoFrame*, 4> VideoFrames{};
+	std::mutex VideoFramesMutex;
+	std::condition_variable FrameCompletionCondition;
+	std::deque<IDeckLinkVideoFrame*> CompletedFramesQueue;
+	
+	uint32_t TotalFramesScheduled = 0;
+	uint32_t NextFrameToSchedule = 0;
+
+	operator bool() const
+	{
+		return Interface != nullptr;
+	}
+	IDeckLinkOutput* operator->() const
+	{
+		return Interface;
+	}
+
+	~OutputHandler();
+
+	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
+	bool Close();
+
+	bool WaitFrame(std::chrono::milliseconds timeout);
+	void ScheduleNextFrame();
+	void DmaWrite(const void* buffer, size_t size);
+
+	std::optional<nosVec2u> GetDeltaSeconds() const;
+};
+
+	
+struct InputHandler
+{
+	IDeckLinkInput* Interface = nullptr;
+	bool IsActive = false;
+	operator bool() const
+	{
+		return Interface != nullptr;
+	}
+	IDeckLinkInput* operator->() const
+	{
+		return Interface;
+	}
+
+	~InputHandler();
+};
+	
 class SubDevice
 {
 public:
@@ -37,7 +91,6 @@ public:
 	int64_t DeviceGroupId = -1;
 	int64_t TopologicalId = -1;
 	std::string Handle;
-	std::vector<std::string> ProfileNames;
 
 	// Output
 	bool DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
@@ -54,21 +107,10 @@ public:
 	IDeckLinkProfileManager* ProfileManager = nullptr;
 protected:
 	IDeckLink* Device = nullptr;
-	IDeckLinkInput* Input = nullptr;
-	IDeckLinkOutput* Output = nullptr;
 	IDeckLinkProfileAttributes* ProfileAttributes = nullptr;
-	BMDTimeValue FrameDuration = 0;
-	BMDTimeScale TimeScale = 0;
-	
-	std::array<IDeckLinkMutableVideoFrame*, 4> VideoFrames{};
-	std::mutex VideoFramesMutex;
-	std::condition_variable FrameCompletionCondition;
-	std::deque<IDeckLinkVideoFrame*> CompletedFramesQueue;
 
-	uint32_t TotalFramesScheduled = 0;
-	uint32_t NextFrameToSchedule = 0;
-
-	std::unordered_map<nosMediaIODirection, bool> ActiveModes;
+	OutputHandler Output;
+	InputHandler Input;
 };
 
 class Device

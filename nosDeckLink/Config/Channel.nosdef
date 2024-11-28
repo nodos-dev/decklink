@@ -36,7 +36,8 @@
                     "name": "IsOpen",
                     "type_name": "bool",
                     "show_as": "PROPERTY",
-                    "can_show_as": "PROPERTY_ONLY"
+                    "can_show_as": "PROPERTY_ONLY",
+                    "data": true
                 },
                 {
                     "name": "IsInput",
@@ -78,7 +79,8 @@
                     "display_name": "Channel Resolution",
                     "type_name": "nos.fb.vec2u",
                     "show_as": "OUTPUT_PIN",
-                    "can_show_as": "OUTPUT_PIN_OR_PROPERTY"
+                    "can_show_as": "OUTPUT_PIN_OR_PROPERTY",
+                    "readonly": true
                 }
             ],
             "functions": [

@@ -135,8 +135,8 @@ private:
 class OutputCallback : public Object<IDeckLinkVideoOutputCallback>
 {
 public:
-	OutputCallback(SubDevice* deckLinkDevice) :
-		Device(deckLinkDevice)
+	OutputCallback(OutputHandler* outputHandler) :
+		Output(outputHandler)
 	{
 	}
 
@@ -150,16 +150,16 @@ public:
 	}
 
 private:
-	SubDevice*  Device;
+	OutputHandler*  Output;
 };
 	
 HRESULT	OutputCallback::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result)
 {
 	{
-		std::unique_lock lock(Device->VideoFramesMutex);
-		Device->CompletedFramesQueue.push_back(completedFrame);
+		std::unique_lock lock(Output->VideoFramesMutex);
+		Output->CompletedFramesQueue.push_back(completedFrame);
 	}
-	Device->FrameCompletionCondition.notify_one();
+	Output->FrameCompletionCondition.notify_one();
 	if (result != bmdOutputFrameCompleted)
 	{
 		const char* resultStr = nullptr;
@@ -168,7 +168,7 @@ HRESULT	OutputCallback::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFr
 		case bmdOutputFrameDisplayedLate: resultStr = "'DisplayedLate'"; break;
 		case bmdOutputFrameFlushed: resultStr = "'Flushed'"; break;
 		}
-		nosEngine.LogW("DeckLink %s: A frame completed with %s", Device->Handle.c_str(), resultStr);
+		nosEngine.LogW("DeckLink: A frame completed with %s", resultStr);
 	}
 
 	return S_OK;
@@ -189,6 +189,150 @@ void Release(T& obj)
 	}
 }
 
+OutputHandler::~OutputHandler()
+{
+	Release(Interface);
+	for (auto& frame : VideoFrames)
+		Release(frame);
+}
+
+bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
+{
+	if (IsActive)
+		return false;
+
+	HRESULT res = S_OK;
+	{
+		std::unique_lock lock(VideoFramesMutex);
+		for (auto& frame : VideoFrames)
+			Release(frame);
+		for (auto& frame : VideoFrames)
+		{
+			// Get width and height from display mode
+			long width, height;
+			{
+				IDeckLinkDisplayMode* displayModeInterface = nullptr;
+				res = Interface->GetDisplayMode(displayMode, &displayModeInterface);
+				if (FAILED(res))
+					return false;
+				width = displayModeInterface->GetWidth();
+				height = displayModeInterface->GetHeight();
+				res = displayModeInterface->GetFrameRate(&FrameDuration, &TimeScale);
+				if (FAILED(res))
+					return false;
+				Release(displayModeInterface);
+			}
+			Interface->CreateVideoFrame(width, height, width * 2, pixelFormat, bmdFrameFlagDefault, &frame);
+			if (!frame)
+				return false;
+			CompletedFramesQueue.push_back(frame);
+		}
+	}
+
+	res = Interface->EnableVideoOutput(displayMode, bmdVideoOutputFlagDefault);
+	if (FAILED(res))
+		return false;
+
+	IsActive = true;
+
+	auto outputCallback = new OutputCallback(this);
+	if (outputCallback == nullptr)
+		nosEngine.LogE("Could not create output callback");
+	res = Interface->SetScheduledFrameCompletionCallback(outputCallback);
+	if (FAILED(res))
+		nosEngine.LogE("SubDevice: Failed to set output callback");
+
+	res = Interface->StartScheduledPlayback(0, TimeScale, 1.0);
+	if (FAILED(res))
+		nosEngine.LogE("SubDevice: Failed to start scheduled playback");
+
+	return true;
+}
+
+bool OutputHandler::Close()
+{
+	if (!IsActive)
+	{
+		nosEngine.LogE("SubDevice: Output is not active");
+		return false;
+	}
+
+	if (Interface->StopScheduledPlayback(0, nullptr, TimeScale) != S_OK)
+	{
+		nosEngine.LogE("Failed to stop scheduled playback");
+	}
+
+	auto res = Interface->DisableVideoOutput();
+	if (FAILED(res))
+	{
+		nosEngine.LogE("SubDevice: Failed to disable video output");
+		return false;
+	}
+	IsActive = false;
+	{
+		std::unique_lock lock(VideoFramesMutex);
+		for (auto& frame : VideoFrames)
+			Release(frame);
+		CompletedFramesQueue.clear();
+	}
+	return true;
+}
+
+bool OutputHandler::WaitFrame(std::chrono::milliseconds timeout)
+{
+	std::unique_lock lock(VideoFramesMutex);
+	return FrameCompletionCondition.wait_for(lock, timeout, [this]()
+	{
+		return !CompletedFramesQueue.empty();
+	});
+}
+
+void OutputHandler::ScheduleNextFrame()
+{
+	IDeckLinkVideoFrame* frameToSchedule = VideoFrames[NextFrameToSchedule];
+	NextFrameToSchedule = ++NextFrameToSchedule % VideoFrames.size();
+	HRESULT result = Interface->ScheduleVideoFrame(frameToSchedule, TotalFramesScheduled * FrameDuration, FrameDuration, TimeScale);
+	if (result != S_OK)
+		nosEngine.LogE("Failed to schedule video frame");
+	++TotalFramesScheduled;
+}
+
+void OutputHandler::DmaWrite(const void* buffer, size_t size)
+{
+	void* frameBytes = nullptr;
+	size_t actualBufferSize = 0;
+	{
+		std::unique_lock lock (VideoFramesMutex);
+		if (CompletedFramesQueue.empty())
+			return;
+		auto frameBuffer = CompletedFramesQueue.front();
+		frameBuffer->GetBytes(&frameBytes);
+		actualBufferSize = frameBuffer->GetRowBytes() * frameBuffer->GetHeight();
+		CompletedFramesQueue.pop_front();
+	}
+	if (frameBytes && buffer)
+	{
+		if (size != actualBufferSize)
+		{
+			nosEngine.LogE("Buffer size does not match frame size");
+		}
+		size_t copySize = std::min(size, actualBufferSize);
+		std::memcpy(frameBytes, buffer, copySize);
+	}
+}
+
+std::optional<nosVec2u> OutputHandler::GetDeltaSeconds() const
+{
+	if (!IsActive)
+		return std::nullopt;
+	return nosVec2u{ (uint32_t)FrameDuration, (uint32_t)TimeScale };
+}
+
+InputHandler::~InputHandler()
+{
+	Release(Interface);
+}
+
 SubDevice::SubDevice(IDeckLink* deviceInterface)
 	: Device(deviceInterface)
 {
@@ -198,10 +342,10 @@ SubDevice::SubDevice(IDeckLink* deviceInterface)
 	nosEngine.LogI("DeckLink Device created: %s", ModelName.c_str());
 	DeleteString(modelName);
 
-	auto res = Device->QueryInterface(IID_IDeckLinkInput, (void**)&Input);
+	auto res = Device->QueryInterface(IID_IDeckLinkInput, (void**)&Input.Interface);
 	if (FAILED(res))
 		nosEngine.LogE("DeckLinkDevice: Failed to get input interface for device: %s", ModelName.c_str());
-	res = Device->QueryInterface(IID_IDeckLinkOutput, (void**)&Output);
+	res = Device->QueryInterface(IID_IDeckLinkOutput, (void**)&Output.Interface);
 	if (FAILED(res))
 		nosEngine.LogE("DeckLinkDevice: Failed to get output interface for device: %s", ModelName.c_str());
 
@@ -252,17 +396,20 @@ SubDevice::SubDevice(IDeckLink* deviceInterface)
 SubDevice::~SubDevice()
 {
 	Release(Device);
-	Release(Input);
-	Release(Output);
 	Release(ProfileAttributes);
 	Release(ProfileManager);
-	for (auto& frame : VideoFrames)
-		Release(frame);
 }
 
 bool SubDevice::IsBusyWith(nosMediaIODirection mode)
 {
-	return ActiveModes[mode];
+	switch (mode)
+	{
+	case NOS_MEDIAIO_DIRECTION_INPUT:
+		return Input.IsActive;
+	case NOS_MEDIAIO_DIRECTION_OUTPUT:
+		return Output.IsActive;
+	}
+	return false;
 }
 
 std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> SubDevice::GetSupportedOutputFrameGeometryAndFrameRates(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats)
@@ -320,63 +467,7 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 		return false;
 	}
 
-	auto res = Output->EnableVideoOutput(displayMode, bmdVideoOutputFlagDefault);
-	if (FAILED(res))
-	{
-		nosEngine.LogE("SubDevice: Failed to enable video output for device: %s", ModelName.c_str());
-		return false;
-	}
-
-	ActiveModes[NOS_MEDIAIO_DIRECTION_OUTPUT] = true;
-
-	for (auto& frame : VideoFrames)
-		Release(frame);
-	for (auto& frame : VideoFrames)
-	{
-		// Get width and height from display mode
-		long width, height;
-		{
-			IDeckLinkDisplayMode *displayModeInterface = nullptr;
-			res = Output->GetDisplayMode(displayMode, &displayModeInterface);
-			if (FAILED(res))
-			{
-				nosEngine.LogE("SubDevice: Failed to get display mode for device: %s", ModelName.c_str());
-				return false;
-			}
-			width = displayModeInterface->GetWidth();
-			height = displayModeInterface->GetHeight();
-			res = displayModeInterface->GetFrameRate(&FrameDuration, &TimeScale);
-			if (FAILED(res))
-			{
-				nosEngine.LogE("SubDevice: Failed to get frame rate for device: %s", ModelName.c_str());
-				return false;
-			}
-			Release(displayModeInterface);
-		}
-		Output->CreateVideoFrame(width, height, width * 2, pixelFormat, bmdFrameFlagDefault, &frame);
-		if (!frame)
-		{
-			nosEngine.LogE("SubDevice: Failed to create video frame for device: %s", ModelName.c_str());
-			return false;
-		}
-		{
-			std::unique_lock lock(VideoFramesMutex);
-			CompletedFramesQueue.push_back(frame);
-		}
-	}
-
-	auto outputCallback = new OutputCallback(this);
-	if (outputCallback == nullptr)
-		nosEngine.LogE("Could not create output callback");
-	res = Output->SetScheduledFrameCompletionCallback(outputCallback);
-	if (FAILED(res))
-		nosEngine.LogE("SubDevice: Failed to set output callback for device: %s", ModelName.c_str());
-
-	res = Output->StartScheduledPlayback(0, TimeScale, 1.0);
-	if (FAILED(res))
-		nosEngine.LogE("SubDevice: Failed to start scheduled playback for device: %s", ModelName.c_str());
-
-	return true;
+	return Output.Open(displayMode, pixelFormat);
 }
 
 bool SubDevice::CloseOutput()
@@ -386,24 +477,7 @@ bool SubDevice::CloseOutput()
 		nosEngine.LogE("SubDevice: Output interface is not available for device: %s", ModelName.c_str());
 		return false;
 	}
-	if (!ActiveModes[NOS_MEDIAIO_DIRECTION_OUTPUT])
-	{
-		nosEngine.LogE("SubDevice: Output is not active for device: %s", ModelName.c_str());
-		return false;
-	}
-
-	if (Output->StopScheduledPlayback(0, nullptr, TimeScale) != S_OK)
-	{
-		nosEngine.LogE("Failed to stop scheduled playback for device: %s", ModelName.c_str());
-	}
-
-	auto res = Output->DisableVideoOutput();
-	if (FAILED(res))
-	{
-		nosEngine.LogE("SubDevice: Failed to disable video output for device: %s", ModelName.c_str());
-		return false;
-	}
-	return true;
+	return Output.Close();
 }
 
 bool SubDevice::OpenInput(BMDPixelFormat pixelFormat)
@@ -420,50 +494,25 @@ bool SubDevice::CloseInput()
 
 bool SubDevice::WaitFrame(std::chrono::milliseconds timeout)
 {
-	std::unique_lock lock(VideoFramesMutex);
-	return FrameCompletionCondition.wait_for(lock, timeout, [this]()
-	{
-		return !CompletedFramesQueue.empty();
-	});
+	return Output.WaitFrame(timeout); // TODO: Input
 }
 
 void SubDevice::ScheduleNextFrame()
 {
-	IDeckLinkVideoFrame* frameToSchedule = VideoFrames[NextFrameToSchedule];
-	NextFrameToSchedule = ++NextFrameToSchedule % VideoFrames.size();
-	HRESULT result = Output->ScheduleVideoFrame(frameToSchedule, TotalFramesScheduled * FrameDuration, FrameDuration, TimeScale);
-	if (result != S_OK)
-	{
-		nosEngine.LogE("Failed to schedule video frame for device: %s", ModelName.c_str());
-	}
-	++TotalFramesScheduled;
+	Output.ScheduleNextFrame(); // TODO: Input
 }
 
 void SubDevice::DmaWrite(const void* buffer, size_t size)
 {
-	util::Stopwatch sw;
-	void* frameBytes = nullptr;
-	{
-		std::unique_lock lock (VideoFramesMutex);
-		if (CompletedFramesQueue.empty())
-		{
-			nosEngine.LogW("%s: No frame to write", Handle.c_str());
-			return;
-		}
-		auto frameBuffer = CompletedFramesQueue.front();
-		frameBuffer->GetBytes(&frameBytes);
-		CompletedFramesQueue.pop_front();
-	}
-	if (frameBytes && buffer)
-	{
-		std::memcpy(frameBytes, buffer, size);
-	}
-	nosEngine.WatchLog(("DeckLink " + Handle + " DMA Time").c_str(), sw.ElapsedString().c_str());
+	Output.DmaWrite(buffer, size); // TODO: Input
 }
 
 nosVec2u SubDevice::GetDeltaSeconds() const
 {
-	return nosVec2u{ (uint32_t)FrameDuration, (uint32_t)TimeScale };
+	auto deltaSecs = Output.GetDeltaSeconds(); // TODO: Input
+	if (deltaSecs)
+		return *deltaSecs;
+	return nosVec2u{ 0, 0 };
 }
 
 class ProfileChangeCallback : public Object<IDeckLinkProfileCallback>

@@ -15,6 +15,7 @@ NOS_REGISTER_NAME(Resolution);
 NOS_REGISTER_NAME(FrameRate);
 NOS_REGISTER_NAME(IsOpen);
 NOS_REGISTER_NAME(ChannelId);
+NOS_REGISTER_NAME(ChannelResolution);
 
 enum class ChangedPinType
 {
@@ -34,8 +35,10 @@ enum class ChannelUpdateResult
 	
 struct ChannelHandler
 {
+	bool ShouldOpen = true;
 	bool IsOpen = false;
 	nosUUID OutChannelPinId;
+	nosUUID OutResolutionPinId;
 	int32_t DeviceIndex = -1;
 	nosMediaIODirection Direction = NOS_MEDIAIO_DIRECTION_OUTPUT;
 	nosDeckLinkChannel Channel = NOS_DECKLINK_CHANNEL_INVALID;
@@ -64,11 +67,14 @@ struct ChannelHandler
 	{
 		nosDeckLink->CloseChannel(DeviceIndex, Channel);
 		IsOpen = false;
-		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId{}));
+		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId(-1, 0, false)));
+		nosEngine.SetPinValue(OutResolutionPinId, nos::Buffer::From(nosVec2u{0, 0}));
 	}
 	
 	bool Open()
 	{
+		if (!ShouldOpen)
+			return false;
 		if (DeviceIndex == -1)
 			return false;
 		if (Channel == NOS_DECKLINK_CHANNEL_INVALID)
@@ -90,8 +96,11 @@ struct ChannelHandler
 		if (res != NOS_RESULT_SUCCESS)
 			return false;
 		IsOpen = true;
-		ChannelId id(true, DeviceIndex, Channel, Direction);
+		ChannelId id(DeviceIndex, Channel, Direction);
 		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(id));
+		nosVec2u resolution{};
+		nosMediaIO->Get2DFrameResolution(Resolution, &resolution);
+		nosEngine.SetPinValue(OutResolutionPinId, nos::Buffer::From(resolution));
 		return true;
 	}
 };
@@ -108,11 +117,16 @@ public:
 		SetPinVisualizer(NSN_FrameRate, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetFrameRateStringListName()});
 
 		Channel.OutChannelPinId = *GetPinId(NSN_ChannelId);
+		Channel.OutResolutionPinId = *GetPinId(NSN_ChannelResolution);
 
 		UpdateStringList(GetDeviceStringListName(), GetPossibleDeviceNames());
 
 		AddPinValueWatcher(NSN_IsOpen, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
-			ShouldOpen = *InterpretPinValue<bool>(newVal);
+			Channel.ShouldOpen = *InterpretPinValue<bool>(newVal);
+			if (!Channel.ShouldOpen)
+				Channel.Close();
+			else
+				Channel.Open();
 		});
 		AddPinValueWatcher(NSN_IsInput, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			
@@ -231,7 +245,6 @@ public:
 
 	void ResetAfter(ChangedPinType pin)
 	{
-		// CurrentChannel.Update({}, true);
 		nos::Name pinToSet;
 		switch (pin)
 		{
@@ -338,7 +351,6 @@ public:
 		return possibleFrameRates;
 	}
 
-	bool ShouldOpen = false;
 	bool IsInput = false;
 	std::string DevicePinValue = "NONE";
 	std::string ChannelPinValue = "NONE";

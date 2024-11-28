@@ -36,7 +36,7 @@ struct DMAWriteNode : NodeContext
 				return;
 			LastChannelId = newChannelId;
 			nosVec2u deltaSeconds{0, 0};
-			if (LastChannelId.is_open())
+			if (LastChannelId.device_index() != -1)
 			{
 				nosDeckLink->GetCurrentDeltaSecondsOfChannel(LastChannelId.device_index(), static_cast<nosDeckLinkChannel>(LastChannelId.channel_index()), &deltaSeconds);
 				if (memcmp(&deltaSeconds, &LastDeltaSeconds, sizeof(deltaSeconds)) != 0)
