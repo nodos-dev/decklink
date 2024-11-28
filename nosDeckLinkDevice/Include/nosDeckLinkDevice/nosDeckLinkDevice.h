@@ -77,6 +77,7 @@ typedef struct nosDeckLinkSubsystem {
 	nosResult (NOSAPI_CALL* GetSupportedOutputFrameRatesForGeometry)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosMediaIOFrameGeometry geometry, nosMediaIOFrameRateList* outFrameRates);
 	nosResult (NOSAPI_CALL* OpenChannel)(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params);
 	nosResult (NOSAPI_CALL* CloseChannel)(uint32_t deviceIndex, nosDeckLinkChannel channel);
+	nosResult (NOSAPI_CALL* GetCurrentDeltaSecondsOfChannel)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosVec2u* outDeltaSeconds);
 
 	// I/O
 	nosResult (NOSAPI_CALL* WaitFrame)(uint32_t deviceIndex, nosDeckLinkChannel channel, uint32_t timeoutMs);

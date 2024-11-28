@@ -212,6 +212,15 @@ nosResult NOSAPI_CALL CloseChannel(uint32_t deviceIndex, nosDeckLinkChannel chan
 	return NOS_RESULT_NOT_FOUND;
 }
 
+nosResult NOSAPI_CALL GetCurrentDeltaSecondsOfChannel(uint32_t deviceIndex, nosDeckLinkChannel channel, nosVec2u* outDeltaSeconds)
+{
+	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel); // TODO: Not only output
+	if (!subDevice)
+		return NOS_RESULT_NOT_FOUND;
+	*outDeltaSeconds = subDevice->GetDeltaSeconds();
+	return NOS_RESULT_SUCCESS;
+}
+
 nosResult NOSAPI_CALL WaitFrame(uint32_t deviceIndex, nosDeckLinkChannel channel, uint32_t timeoutMs)
 {
 	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
@@ -262,6 +271,7 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->GetSupportedOutputFrameRatesForGeometry = GetSupportedOutputFrameRatesForGeometry;
 	subsystem->OpenChannel = OpenChannel;
 	subsystem->CloseChannel = CloseChannel;
+	subsystem->GetCurrentDeltaSecondsOfChannel = GetCurrentDeltaSecondsOfChannel;
 	subsystem->WaitFrame = WaitFrame;
 	subsystem->DMAWrite = DMAWrite;
 	subsystem->ScheduleNextFrame = ScheduleNextFrame;

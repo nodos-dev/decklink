@@ -284,7 +284,6 @@ std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> SubDevice::GetS
 				if (DoesSupportOutputVideoMode(displayMode, GetDeckLinkPixelFormat(pixelFormat)))
 				{
 					supported[fg].insert(GetFrameRateFromDisplayMode(displayMode));
-					break;
 				}
 			}
 		}
@@ -360,6 +359,10 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 			nosEngine.LogE("SubDevice: Failed to create video frame for device: %s", ModelName.c_str());
 			return false;
 		}
+		{
+			std::unique_lock lock(VideoFramesMutex);
+			CompletedFramesQueue.push_back(frame);
+		}
 	}
 
 	auto outputCallback = new OutputCallback(this);
@@ -373,8 +376,6 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 	if (FAILED(res))
 		nosEngine.LogE("SubDevice: Failed to start scheduled playback for device: %s", ModelName.c_str());
 
-	for (size_t i = 0; i < VideoFrames.size(); ++i)
-		ScheduleNextFrame();
 	return true;
 }
 

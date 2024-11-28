@@ -54,6 +54,11 @@ struct ChannelHandler
 			return ChannelUpdateResult::UnsupportedSettings;
 		return ChannelUpdateResult::Opened;
 	}
+
+	~ChannelHandler()
+	{
+		Close();
+	}
 	
 	void Close()
 	{

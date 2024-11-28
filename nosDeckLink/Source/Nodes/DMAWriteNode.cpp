@@ -22,13 +22,30 @@ struct DMAWriteNode : NodeContext
 	{
 		*out = nosScheduleInfo{
 			.Importance = 1,
-			.DeltaSeconds = /*Device ? Device->GetDeltaSeconds() : */nosVec2u{0, 0},
+			.DeltaSeconds = LastDeltaSeconds,
 			.Type = NOS_SCHEDULE_TYPE_ON_DEMAND,
 		};
 	}
 
 	void OnPinValueChanged(nos::Name pinName, nosUUID pinId, nosBuffer value) override
-	{
+	{ 
+		if (pinName == NOS_NAME_STATIC("ChannelId"))
+		{
+			auto& newChannelId = *InterpretPinValue<ChannelId>(value);
+			if (LastChannelId == newChannelId)
+				return;
+			LastChannelId = newChannelId;
+			nosVec2u deltaSeconds{0, 0};
+			if (LastChannelId.is_open())
+			{
+				nosDeckLink->GetCurrentDeltaSecondsOfChannel(LastChannelId.device_index(), static_cast<nosDeckLinkChannel>(LastChannelId.channel_index()), &deltaSeconds);
+				if (memcmp(&deltaSeconds, &LastDeltaSeconds, sizeof(deltaSeconds)) != 0)
+				{
+					LastDeltaSeconds = deltaSeconds;
+					nosEngine.RecompilePath(NodeId);
+				}
+			}
+		}
 	}
 
 	nosResult ExecuteNode(nosNodeExecuteParams* params) override
@@ -78,6 +95,9 @@ struct DMAWriteNode : NodeContext
 		nosScheduleNodeParams schedule{.NodeId = NodeId, .AddScheduleCount = 1};
 		nosEngine.ScheduleNode(&schedule);
 	}
+
+	ChannelId LastChannelId;
+	nosVec2u LastDeltaSeconds{0, 0};
 };
 
 nosResult RegisterDMAWriteNode(nosNodeFunctions* functions)
