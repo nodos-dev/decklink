@@ -247,41 +247,26 @@ bool SubDevice::CloseInput()
 	return Input.Close();
 }
 
-// TODO: Lose switch cases
+constexpr IOHandlerBaseI& SubDevice::GetIO(nosMediaIODirection dir)
+{
+	if (dir == NOS_MEDIAIO_DIRECTION_INPUT)
+		return Input;
+	return Output;
+}
 
 bool SubDevice::WaitFrame(nosMediaIODirection dir, std::chrono::milliseconds timeout)
 {
-	switch (dir)
-	{
-	case NOS_MEDIAIO_DIRECTION_INPUT:
-		return Input.WaitFrame(timeout);
-	case NOS_MEDIAIO_DIRECTION_OUTPUT:
-		return Output.WaitFrame(timeout);
-	}
+	return GetIO(dir).WaitFrame(timeout);
 }
 
 void SubDevice::DmaTransfer(nosMediaIODirection dir, void* buffer, size_t size)
 {
-	switch (dir)
-	{
-	case NOS_MEDIAIO_DIRECTION_INPUT:
-		Input.DmaTransfer(dir, buffer, size);
-		break;
-	case NOS_MEDIAIO_DIRECTION_OUTPUT:
-		Output.DmaTransfer(dir, buffer, size);
-		break;
-	}
+	GetIO(dir).DmaTransfer(buffer, size);
 }
 
-std::optional<nosVec2u> SubDevice::GetDeltaSeconds(nosMediaIODirection dir) const
+std::optional<nosVec2u> SubDevice::GetDeltaSeconds(nosMediaIODirection dir)
 {
-	switch (dir)
-	{
-	case NOS_MEDIAIO_DIRECTION_INPUT:
-		return Input.GetDeltaSeconds();
-	case NOS_MEDIAIO_DIRECTION_OUTPUT:
-		return Output.GetDeltaSeconds();
-	}
+	return GetIO(dir).GetDeltaSeconds();
 }
 
 class ProfileChangeCallback : public Object<IDeckLinkProfileCallback>

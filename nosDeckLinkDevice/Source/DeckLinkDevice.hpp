@@ -91,20 +91,27 @@ private:
 
 std::vector<std::unique_ptr<class Device>> InitializeDevices();
 
-template <typename T>
-struct IOBase
+struct IOHandlerBaseI
 {
-	virtual ~IOBase() = default;
-	T* Interface = nullptr;
+	virtual ~IOHandlerBaseI() = default;
 	bool IsActive = false;
 
 	BMDTimeValue FrameDuration = 0;
 	BMDTimeScale TimeScale = 0;
 
-	std::mutex VideoFramesMutex;
-	std::condition_variable FrameAvailableCond;
-	std::deque<IDeckLinkVideoFrame*> FrameQueue;
+	virtual bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) = 0;
+	virtual bool Close() = 0;
+
+	virtual bool WaitFrame(std::chrono::milliseconds timeout) = 0;
+	virtual void DmaTransfer(void* buffer, size_t size) = 0;
+	std::optional<nosVec2u> GetDeltaSeconds() const;
+};
 	
+template <typename T>
+struct IOHandlerBase : IOHandlerBaseI
+{
+	T* Interface = nullptr;
+	~IOHandlerBase() override = default;
 	operator bool() const
 	{
 		return Interface != nullptr;
@@ -113,82 +120,54 @@ struct IOBase
 	{
 		return Interface;
 	}
-
-	virtual bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) = 0;
-	virtual bool Close() = 0;
-
-	virtual bool WaitFrame(std::chrono::milliseconds timeout);
-	virtual void OnDmaTransferCompleted() {}
-	void DmaTransfer(nosMediaIODirection dir, void* buffer, size_t size)
-	{
-		{
-			std::unique_lock lock (VideoFramesMutex);
-			if (FrameQueue.empty())
-				return;
-			auto frameBuffer = FrameQueue.front();
-			void* frameBytes = nullptr;
-			frameBuffer->GetBytes(&frameBytes);
-			size_t actualBufferSize = frameBuffer->GetRowBytes() * frameBuffer->GetHeight();
-			if (frameBytes && buffer)
-			{
-				if (size != actualBufferSize)
-				{
-					nosEngine.LogE("Buffer size does not match frame size");
-				}
-				size_t copySize = std::min(size, actualBufferSize);
-				auto* dst = dir == NOS_MEDIAIO_DIRECTION_INPUT ? buffer : frameBytes;
-				auto* src = dir == NOS_MEDIAIO_DIRECTION_INPUT ? frameBytes : buffer;
-				std::memcpy(dst, src, copySize);
-			}
-			if (dir == NOS_MEDIAIO_DIRECTION_INPUT)
-				frameBuffer->Release();
-			FrameQueue.pop_front();
-		}
-		OnDmaTransferCompleted();
-	}
-	std::optional<nosVec2u> GetDeltaSeconds() const;
 };
 
-template <typename T>
-bool IOBase<T>::WaitFrame(std::chrono::milliseconds timeout)
-{
-	std::unique_lock lock(VideoFramesMutex);
-	return FrameAvailableCond.wait_for(lock, timeout, [this]()
-	{
-		return !FrameQueue.empty();
-	});
-}
-
-template <typename T>
-std::optional<nosVec2u> IOBase<T>::GetDeltaSeconds() const
+inline std::optional<nosVec2u> IOHandlerBaseI::GetDeltaSeconds() const
 {
 	if (!IsActive)
 		return std::nullopt;
 	return nosVec2u{ (uint32_t)FrameDuration, (uint32_t)TimeScale };
 }
 
-struct OutputHandler : IOBase<IDeckLinkOutput>
+struct OutputHandler : IOHandlerBase<IDeckLinkOutput>
 {
 	std::array<IDeckLinkMutableVideoFrame*, 4> VideoFrames{};
 	
 	uint32_t TotalFramesScheduled = 0;
 	uint32_t NextFrameToSchedule = 0;
 
+	std::mutex VideoFramesMutex;
+	std::condition_variable WriteCond;
+	std::deque<IDeckLinkVideoFrame*> WriteQueue;
+
 	~OutputHandler() override;
 
 	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) override;
 	bool Close() override;
+	bool WaitFrame(std::chrono::milliseconds timeout) override;
+	void DmaTransfer(void* buffer, size_t size) override;
 	
 	void ScheduleNextFrame();
-	void OnDmaTransferCompleted() override;
+	void ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
 };
 	
-struct InputHandler : IOBase<IDeckLinkInput>
+struct InputHandler : IOHandlerBase<IDeckLinkInput>
 {
 	~InputHandler() override;
+
+	std::condition_variable ReadRequestedCond;
+	std::condition_variable CanReadCond;
+	std::mutex ReadRequestedMutex;
+	std::mutex CanReadMutex;
+	std::mutex VideoBufferMutex;
+	nos::Buffer VideoBuffer;
 	
 	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) override;
 	bool Close() override;
+	bool WaitFrame(std::chrono::milliseconds timeout) override;
+	void DmaTransfer(void* buffer, size_t size) override;
+
+	void OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* frame);
 };
 	
 class SubDevice
@@ -214,13 +193,12 @@ public:
 	bool CloseOutput();
 	bool WaitFrame(nosMediaIODirection dir, std::chrono::milliseconds timeout);
 	void DmaTransfer(nosMediaIODirection dir, void* buffer, size_t size);
-	std::optional<nosVec2u> GetDeltaSeconds(nosMediaIODirection dir) const;
+	std::optional<nosVec2u> GetDeltaSeconds(nosMediaIODirection dir);
 	
 	bool OpenInput(BMDPixelFormat pixelFormat);
 	bool CloseInput();
 
-	template<typename T>
-	constexpr IOBase<T>& GetIO(nosMediaIODirection dir);
+	constexpr IOHandlerBaseI& GetIO(nosMediaIODirection dir);
 
 	IDeckLinkProfileManager* ProfileManager = nullptr;
 protected:
@@ -230,19 +208,6 @@ protected:
 	OutputHandler Output;
 	InputHandler Input;
 };
-
-template <typename T>
-constexpr IOBase<T>& SubDevice::GetIO(nosMediaIODirection dir)
-{
-	switch (dir)
-	{
-	case NOS_MEDIAIO_DIRECTION_INPUT:
-		return Input;
-	case NOS_MEDIAIO_DIRECTION_OUTPUT:
-		return Output;
-	}
-	assert(false);
-}
 
 class Device
 {

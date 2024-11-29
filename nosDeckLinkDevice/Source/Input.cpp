@@ -136,12 +136,7 @@ public:
 
 	HRESULT STDMETHODCALLTYPE VideoInputFrameArrived (/* in */ IDeckLinkVideoInputFrame* videoFrame, /* in */ IDeckLinkAudioInputPacket* audioPacket)
 	{
-		{
-			std::scoped_lock lock(Input->VideoFramesMutex);
-			videoFrame->AddRef();
-			Input->FrameQueue.push_back(videoFrame);
-		}
-		Input->FrameAvailableCond.notify_one();
+		Input->OnInputFrameArrived_DeckLinkThread(videoFrame);
 		return S_OK;
 	}
 
@@ -224,10 +219,48 @@ bool InputHandler::Close()
 		return false;
 
 	IsActive = false;
-	{
-		std::scoped_lock lock(VideoFramesMutex);
-		FrameQueue.clear();
-	}
 	return true;
+}
+
+bool InputHandler::WaitFrame(std::chrono::milliseconds timeout)
+{
+	ReadRequestedCond.notify_one();
+	std::unique_lock lock(CanReadMutex);
+	CanReadCond.wait_for(lock, timeout);
+	return true;
+}
+
+void InputHandler::DmaTransfer(void* buffer, size_t size)
+{
+	{
+		std::unique_lock lock(VideoBufferMutex);
+		size_t actualSize = VideoBuffer.Size();
+		if (!actualSize)
+			return;
+		if (actualSize != size)
+		{
+			nosEngine.LogE("DMA Read: Buffer size does not match frame size");
+		}
+		auto copySize = std::min(actualSize, size);
+		std::memcpy(buffer, VideoBuffer.Data(), size);
+	}
+}
+
+void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* frame)
+{
+	{
+		std::unique_lock lock(ReadRequestedMutex);
+		ReadRequestedCond.wait_for(lock, std::chrono::milliseconds(100));
+	}
+	{
+		std::unique_lock lock(VideoBufferMutex);
+		void* bytes;
+		frame->GetBytes(&bytes);
+		size_t bufSize = frame->GetHeight() * frame->GetRowBytes();
+		if (VideoBuffer.Size() != bufSize)
+			VideoBuffer = nos::Buffer(bufSize);
+		std::memcpy(VideoBuffer.Data(), bytes, bufSize);
+	}
+	CanReadCond.notify_one();
 }
 }

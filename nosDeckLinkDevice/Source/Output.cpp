@@ -28,22 +28,7 @@ private:
 	
 HRESULT	OutputCallback::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result)
 {
-	{
-		std::scoped_lock lock(Output->VideoFramesMutex);
-		Output->FrameQueue.push_back(completedFrame);
-	}
-	Output->FrameAvailableCond.notify_one();
-	if (result != bmdOutputFrameCompleted)
-	{
-		const char* resultStr = nullptr;
-		switch (result) {
-		case bmdOutputFrameDropped: resultStr = "'Dropped'"; break;
-		case bmdOutputFrameDisplayedLate: resultStr = "'DisplayedLate'"; break;
-		case bmdOutputFrameFlushed: resultStr = "'Flushed'"; break;
-		}
-		nosEngine.LogW("DeckLink: A frame completed with %s", resultStr);
-	}
-
+	Output->ScheduledFrameCompleted_DeckLinkThread(completedFrame, result);
 	return S_OK;
 }
 
@@ -88,7 +73,7 @@ bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 			Interface->CreateVideoFrame(width, height, width * 2, pixelFormat, bmdFrameFlagDefault, &frame);
 			if (!frame)
 				return false;
-			FrameQueue.push_back(frame);
+			WriteQueue.push_back(frame);
 		}
 	}
 
@@ -148,11 +133,20 @@ bool OutputHandler::Close()
 		std::scoped_lock lock(VideoFramesMutex);
 		for (auto& frame : VideoFrames)
 			Release(frame);
-		FrameQueue.clear();
+		WriteQueue.clear();
 		TotalFramesScheduled = 0;
 		NextFrameToSchedule = 0;
 	}
 	return true;
+}
+
+bool OutputHandler::WaitFrame(std::chrono::milliseconds timeout)
+{
+	std::unique_lock lock(VideoFramesMutex);
+	return WriteCond.wait_for(lock, timeout, [this]()
+	{
+		return !WriteQueue.empty();
+	});
 }
 
 void OutputHandler::ScheduleNextFrame()
@@ -165,8 +159,47 @@ void OutputHandler::ScheduleNextFrame()
 	++TotalFramesScheduled;
 }
 
-void OutputHandler::OnDmaTransferCompleted()
+void OutputHandler::DmaTransfer(void* buffer, size_t size)
 {
+	void* frameBytes = nullptr;
+	size_t actualBufferSize;
+	{
+		std::unique_lock lock(VideoFramesMutex);
+		if (WriteQueue.empty())
+			return;
+		auto frameBuffer = WriteQueue.front();
+		frameBuffer->GetBytes(&frameBytes);
+		actualBufferSize = frameBuffer->GetRowBytes() * frameBuffer->GetHeight();
+		WriteQueue.pop_front();
+	}
+	if (frameBytes && buffer)
+	{
+		if (size != actualBufferSize)
+		{
+			nosEngine.LogE("DMA Write: Buffer size does not match frame size");
+		}
+		size_t copySize = std::min(size, actualBufferSize);
+		std::memcpy(frameBytes, buffer, copySize);
+	}
 	ScheduleNextFrame();
+}
+
+void OutputHandler::ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result)
+{
+	{
+		std::unique_lock lock(VideoFramesMutex);
+		WriteQueue.push_back(completedFrame);
+	}
+	WriteCond.notify_one();
+	if (result != bmdOutputFrameCompleted)
+	{
+		const char* resultStr = nullptr;
+		switch (result) {
+		case bmdOutputFrameDropped: resultStr = "'Dropped'"; break;
+		case bmdOutputFrameDisplayedLate: resultStr = "'DisplayedLate'"; break;
+		case bmdOutputFrameFlushed: resultStr = "'Flushed'"; break;
+		}
+		nosEngine.LogW("DeckLink: A frame completed with %s", resultStr);
+	}
 }
 }
