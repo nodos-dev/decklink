@@ -394,6 +394,30 @@ bool Device::OpenInput(nosDeckLinkChannel channel, BMDPixelFormat pixelFormat)
 	return false;
 }
 
+bool Device::StartStream(nosDeckLinkChannel channel)
+{
+	auto it = OpenChannels.find(channel);
+	if (it == OpenChannels.end())
+	{
+		nosEngine.LogE("No open channel found for channel %s", GetChannelName(channel));
+		return false;
+	}
+	auto [subDevice, mode] = it->second;
+	return subDevice->StartStream(mode);
+}
+
+bool Device::StopStream(nosDeckLinkChannel channel)
+{
+	auto it = OpenChannels.find(channel);
+	if (it == OpenChannels.end())
+	{
+		nosEngine.LogE("No open channel found for channel %s", GetChannelName(channel));
+		return false;
+	}
+	auto [subDevice, mode] = it->second;
+	return subDevice->StopStream(mode);
+}
+
 void Device::ClearSubDevices()
 {
 	SubDevices.clear();

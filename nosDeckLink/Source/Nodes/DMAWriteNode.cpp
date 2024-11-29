@@ -93,6 +93,12 @@ struct DMAWriteNode : NodeContext
 	{
 		nosScheduleNodeParams schedule{.NodeId = NodeId, .AddScheduleCount = 1};
 		nosEngine.ScheduleNode(&schedule);
+		nosDeckLink->StartStream(LastChannelId.device_index(), static_cast<nosDeckLinkChannel>(LastChannelId.channel_index()));
+	}
+
+	void OnPathStop() override
+	{
+		nosDeckLink->StopStream(LastChannelId.device_index(), static_cast<nosDeckLinkChannel>(LastChannelId.channel_index()));
 	}
 
 	ChannelId LastChannelId;

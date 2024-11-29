@@ -35,9 +35,15 @@ public:
 	bool WaitFrame(nosMediaIODirection dir, std::chrono::milliseconds timeout);
 	void DmaTransfer(nosMediaIODirection dir, void* buffer, size_t size);
 	std::optional<nosVec2u> GetDeltaSeconds(nosMediaIODirection dir);
-	
+
+	// Input
 	bool OpenInput(BMDPixelFormat pixelFormat);
+	bool FlushInput();
 	bool CloseInput();
+
+	// Input/Output
+	bool StartStream(nosMediaIODirection mode);
+	bool StopStream(nosMediaIODirection mode);
 
 	constexpr IOHandlerBaseI& GetIO(nosMediaIODirection dir);
 

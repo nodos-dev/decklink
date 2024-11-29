@@ -97,11 +97,36 @@ InputHandler::~InputHandler()
 	Release(Interface);
 }
 
-bool InputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
+void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* frame)
 {
-	if (IsActive)
+	auto inputFrame = std::make_unique<VideoFrame>(frame);
+	inputFrame->StartAccess(bmdBufferAccessRead);
+	{
+		std::unique_lock lock(ReadFramesMutex);
+		ReadFrames.push_back(std::move(inputFrame));
+		nosEngine.WatchLog("Input Frame Count", std::to_string(ReadFrames.size()).c_str());
+	}
+	FrameAvailableCond.notify_one();
+}
+
+bool InputHandler::Flush()
+{
+	auto res = Interface->PauseStreams();
+	if (S_OK != res)
+		return false;
+	
+	res = Interface->FlushStreams();
+	if (S_OK != res)
 		return false;
 
+	std::unique_lock lock(ReadFramesMutex);
+	ReadFrames.clear();
+
+	return true;
+}
+
+bool InputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
+{
 	// Create an instance of notification callback
 	auto callback = new InputCallback(this);
 	if (callback == nullptr)
@@ -134,78 +159,58 @@ bool InputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 			return false;
 		Release(displayModeInterface);
 	}
-	IsActive = true;
-	
-	// Start capture
-	res = Interface->StartStreams();
-	if (res != S_OK)
-	{
-		nosEngine.LogE("Could not start streams - result = %08x", res);
-		Close();
-		return false;
-	}
+	return true;
+}
 
+bool InputHandler::Start()
+{
+	if (S_OK != Interface->StartStreams())
+		return false;
+	return true;
+}
+
+bool InputHandler::Stop()
+{
+	Flush();
+	if (S_OK != Interface->StopStreams())
+		return false;
 	return true;
 }
 
 bool InputHandler::Close()
 {
-	if (!IsActive)
-		return false;
-
-	if (S_OK != Interface->StopStreams())
-		return false;
-
 	if (S_OK != Interface->DisableVideoInput())
 		return false;
-
-	IsActive = false;
 	return true;
 }
 
 bool InputHandler::WaitFrame(std::chrono::milliseconds timeout)
 {
-	ReadRequestedCond.notify_one();
-	std::unique_lock lock(VideoBufferMutex);
-	CanReadCond.wait_for(lock, timeout);
-	return true;
+	std::unique_lock lock(ReadFramesMutex);
+	return FrameAvailableCond.wait_for(lock, timeout, [this]{
+		return !ReadFrames.empty();
+	});
 }
 
 void InputHandler::DmaTransfer(void* buffer, size_t size)
 {
+	std::unique_lock lock(ReadFramesMutex);
+	if (ReadFrames.empty())
 	{
-		std::unique_lock lock(VideoBufferMutex);
-		size_t actualSize = VideoBuffer.Size();
-		if (!actualSize)
-			return;
-		if (actualSize != size)
-		{
-			nosEngine.LogE("DMA Read: Buffer size does not match frame size");
-		}
-		auto copySize = std::min(actualSize, size);
-		std::memcpy(buffer, VideoBuffer.Data(), copySize);
+		nosEngine.LogE("DMA Read: No frame available to read");
+		return;
 	}
-}
-
-void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* frame)
-{
+	auto readFrame = std::move(ReadFrames.front());
+	ReadFrames.pop_front();
+	size_t actualSize = readFrame->Size;
+	if (!actualSize)
+		return;
+	if (actualSize != size)
 	{
-		std::unique_lock lock(VideoBufferMutex);
-		ReadRequestedCond.wait_for(lock, std::chrono::milliseconds(100));
+		nosEngine.LogE("DMA Read: Buffer size does not match frame size");
 	}
-	{
-		std::unique_lock lock(VideoBufferMutex);
-		// TODO: Start access here, end it in DmaTransfer instead of this copy.
-		VideoFrame input(frame);
-		input.StartAccess(bmdBufferAccessRead);
-		auto bytes = input.GetBytes();
-		size_t bufSize = frame->GetHeight() * frame->GetRowBytes();
-		if (VideoBuffer.Size() != bufSize)
-			VideoBuffer = nos::Buffer(bufSize);
-		std::memcpy(VideoBuffer.Data(), bytes, bufSize);
-		input.EndAccess();
-	}
-	CanReadCond.notify_one();
+	auto copySize = std::min(actualSize, size);
+	std::memcpy(buffer, readFrame->GetBytes(), copySize);
 }
 
 void InputHandler::OnInputVideoFormatChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat)

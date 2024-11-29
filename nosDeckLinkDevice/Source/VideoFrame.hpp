@@ -13,9 +13,10 @@ public:
 	bool StartAccess(BMDBufferAccessFlags);
 	void* GetBytes();
 	bool EndAccess();
+	size_t Size;
 protected:
 	IDeckLinkVideoFrame* Frame = nullptr;
 	IDeckLinkVideoBuffer* Buffer = nullptr;
-	BMDBufferAccessFlags AccessFlags = bmdBufferAccessReadAndWrite;
+	std::optional<BMDBufferAccessFlags> AccessFlags = std::nullopt;
 };
 }

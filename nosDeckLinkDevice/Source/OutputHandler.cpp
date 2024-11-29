@@ -48,12 +48,9 @@ OutputHandler::~OutputHandler()
 
 bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 {
-	if (IsActive)
-		return false;
-
 	HRESULT res;
 	{
-		std::scoped_lock lock(VideoFramesMutex);
+		std::unique_lock lock(VideoFramesMutex);
 		for (auto& frame : VideoFrames)
 			Release(frame);
 		for (auto& frame : VideoFrames)
@@ -83,8 +80,6 @@ bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 	if (res != S_OK)
 		return false;
 
-	IsActive = true;
-
 	auto outputCallback = new OutputCallback(this);
 	if (outputCallback == nullptr)
 	{
@@ -100,43 +95,47 @@ bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 		return false;
 	}
 
-	res = Interface->StartScheduledPlayback(0, TimeScale, 1.0);
+	return true;
+}
+
+bool OutputHandler::Start()
+{
+	{
+		std::unique_lock lock(VideoFramesMutex);
+		TotalFramesScheduled = 0;
+	}
+	auto res = Interface->StartScheduledPlayback(0, TimeScale, 1.0);
 	if (res != S_OK)
 	{
 		nosEngine.LogE("SubDevice: Failed to start scheduled playback");
-		Close();
 		return false;
 	}
+	return true;
+}
 
+bool OutputHandler::Stop()
+{
+	if (Interface->StopScheduledPlayback(0, nullptr, TimeScale) != S_OK)
+	{
+		nosEngine.LogE("Failed to stop scheduled playback");
+		return false;
+	}
 	return true;
 }
 
 bool OutputHandler::Close()
 {
-	if (!IsActive)
-	{
-		nosEngine.LogE("SubDevice: Output is not active");
-		return false;
-	}
-
-	if (Interface->StopScheduledPlayback(0, nullptr, TimeScale) != S_OK)
-	{
-		nosEngine.LogE("Failed to stop scheduled playback");
-	}
-
 	auto res = Interface->DisableVideoOutput();
 	if (res != S_OK)
 	{
 		nosEngine.LogE("SubDevice: Failed to disable video output");
 		return false;
 	}
-	IsActive = false;
 	{
-		std::scoped_lock lock(VideoFramesMutex);
+		std::unique_lock lock(VideoFramesMutex);
 		for (auto& frame : VideoFrames)
 			Release(frame);
 		WriteQueue.clear();
-		TotalFramesScheduled = 0;
 		NextFrameToSchedule = 0;
 	}
 	return true;

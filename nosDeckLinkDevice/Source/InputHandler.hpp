@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 #include "nosDeckLinkDevice/nosDeckLinkDevice.h"
+#include "VideoFrame.hpp"
 
 namespace nos::decklink
 {
@@ -10,13 +11,11 @@ struct InputHandler : IOHandlerBase<IDeckLinkInput>
 {
 	~InputHandler() override;
 
-	std::condition_variable ReadRequestedCond;
-	std::condition_variable CanReadCond;
-	std::mutex VideoBufferMutex;
-	nos::Buffer VideoBuffer;
-	
-	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) override;
-	bool Close() override;
+	std::condition_variable FrameAvailableCond;
+	std::deque<std::unique_ptr<VideoFrame>> ReadFrames;
+	std::mutex ReadFramesMutex;
+
+	bool Flush();
 	bool WaitFrame(std::chrono::milliseconds timeout) override;
 	void DmaTransfer(void* buffer, size_t size) override;
 
@@ -29,6 +28,12 @@ struct InputHandler : IOHandlerBase<IDeckLinkInput>
 	std::mutex CallbacksMutex;
 	std::unordered_map<int32_t, std::pair<nosDeckLinkInputVideoFormatChangeCallback, void*>> VideoFormatChangeCallbacks;
 	int32_t NextCallbackId = 0;
+
+protected:
+	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) override;
+	bool Start() override;
+	bool Stop() override;
+	bool Close() override;
 };
 
 }

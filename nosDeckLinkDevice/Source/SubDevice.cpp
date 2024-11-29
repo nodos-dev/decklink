@@ -86,9 +86,9 @@ bool SubDevice::IsBusyWith(nosMediaIODirection mode)
 	switch (mode)
 	{
 	case NOS_MEDIAIO_DIRECTION_INPUT:
-		return Input.IsActive;
+		return Input.IsCurrentlyOpen();
 	case NOS_MEDIAIO_DIRECTION_OUTPUT:
-		return Output.IsActive;
+		return Output.IsCurrentlyOpen();
 	}
 	return false;
 }
@@ -129,6 +129,26 @@ void SubDevice::RemoveInputVideoFormatChangeCallback(uint32_t callbackId)
 	Input.RemoveInputVideoFormatChangeCallback(callbackId);
 }
 
+bool SubDevice::FlushInput()
+{
+	if (!Input)
+	{
+		nosEngine.LogE("SubDevice: Input interface is not available for device: %s", ModelName.c_str());
+		return false;
+	}
+	return Input.Flush();
+}
+
+bool SubDevice::StartStream(nosMediaIODirection mode)
+{
+	return GetIO(mode).StartStream();
+}
+
+bool SubDevice::StopStream(nosMediaIODirection mode)
+{
+	return GetIO(mode).StopStream();
+}
+
 bool SubDevice::DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 {
 	if (!Output)
@@ -157,7 +177,7 @@ bool SubDevice::OpenOutput(BMDDisplayMode displayMode, BMDPixelFormat pixelForma
 		nosEngine.LogE("SubDevice: Output interface is not available for device: %s", ModelName.c_str());
 		return false;
 	}
-	return Output.Open(displayMode, pixelFormat);
+	return Output.OpenStream(displayMode, pixelFormat);
 }
 
 bool SubDevice::CloseOutput()
@@ -167,7 +187,7 @@ bool SubDevice::CloseOutput()
 		nosEngine.LogE("SubDevice: Output interface is not available for device: %s", ModelName.c_str());
 		return false;
 	}
-	return Output.Close();
+	return Output.CloseStream();
 }
 
 bool SubDevice::OpenInput(BMDPixelFormat pixelFormat)
@@ -177,7 +197,7 @@ bool SubDevice::OpenInput(BMDPixelFormat pixelFormat)
 		nosEngine.LogE("SubDevice: Input interface is not available for device: %s", ModelName.c_str());
 		return false;
 	}
-	return Input.Open(bmdModeNTSC, pixelFormat); // Display mode will be auto-detected
+	return Input.OpenStream(bmdModeNTSC, pixelFormat); // Display mode will be auto-detected
 }
 
 bool SubDevice::CloseInput()
@@ -187,7 +207,7 @@ bool SubDevice::CloseInput()
 		nosEngine.LogE("SubDevice: Input interface is not available for device: %s", ModelName.c_str());
 		return false;
 	}
-	return Input.Close();
+	return Input.CloseStream();
 }
 
 constexpr IOHandlerBaseI& SubDevice::GetIO(nosMediaIODirection dir)

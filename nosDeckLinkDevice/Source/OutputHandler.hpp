@@ -17,12 +17,15 @@ struct OutputHandler : IOHandlerBase<IDeckLinkOutput>
 
 	~OutputHandler() override;
 
-	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) override;
-	bool Close() override;
 	bool WaitFrame(std::chrono::milliseconds timeout) override;
 	void DmaTransfer(void* buffer, size_t size) override;
 	
 	void ScheduleNextFrame();
 	void ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
+protected:
+	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) override;
+	bool Start() override;
+	bool Stop() override;
+	bool Close() override;
 };
 }

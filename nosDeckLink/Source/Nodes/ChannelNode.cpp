@@ -86,6 +86,7 @@ struct ChannelHandler
 		IsOpen = false;
 		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId(-1, 0, false)));
 		nosEngine.SetPinValue(OutResolutionPinId, nos::Buffer::From(nosVec2u{0, 0}));
+		nosEngine.SendPathRestart(OutChannelPinId);
 	}
 	
 	bool Open()
@@ -120,6 +121,7 @@ struct ChannelHandler
 		ChannelId id(DeviceIndex, Channel, Direction);
 		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(id));
 		UpdateResolution();
+		nosEngine.SendPathRestart(OutChannelPinId);
 		return true;
 	}
 
@@ -392,6 +394,16 @@ public:
 	std::string FrameRatePinValue = "NONE";
 
 	ChannelHandler Channel;
+
+	void OnPathStart() override
+	{
+		nosDeckLink->StartStream(Channel.DeviceIndex, Channel.Channel);
+	}
+
+	void OnPathStop() override
+	{
+		nosDeckLink->StopStream(Channel.DeviceIndex, Channel.Channel);
+	}
 };
 
 nosResult RegisterChannelNode(nosNodeFunctions* funcs)

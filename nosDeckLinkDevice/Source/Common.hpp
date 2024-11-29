@@ -91,7 +91,6 @@ private:
 struct IOHandlerBaseI
 {
 	virtual ~IOHandlerBaseI() = default;
-	bool IsActive = false;
 
 	BMDTimeValue FrameDuration = 0;
 	BMDTimeScale TimeScale = 0;
@@ -99,9 +98,30 @@ struct IOHandlerBaseI
 	virtual bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) = 0;
 	virtual bool Close() = 0;
 
+	bool OpenStream(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
+	bool StartStream();
+	bool StopStream();
+	bool CloseStream();
+
 	virtual bool WaitFrame(std::chrono::milliseconds timeout) = 0;
 	virtual void DmaTransfer(void* buffer, size_t size) = 0;
 	std::optional<nosVec2u> GetDeltaSeconds() const;
+
+protected:
+	virtual bool Start() = 0;
+	virtual bool Stop() = 0;
+private:
+	bool IsOpen = false;
+	bool IsStreamRunning = false;
+public:
+	bool IsCurrentlyOpen() const
+	{
+		return IsOpen;
+	}
+	bool IsCurrentlyRunning() const
+	{
+		return IsStreamRunning;
+	}
 };
 	
 template <typename T>
@@ -119,9 +139,65 @@ struct IOHandlerBase : IOHandlerBaseI
 	}
 };
 
+inline bool IOHandlerBaseI::OpenStream(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
+{
+	if (IsOpen)
+		return false;
+	if (IsStreamRunning)
+		StopStream();
+	if (Open(displayMode, pixelFormat))
+	{
+		IsOpen = true;
+		return true;
+	}
+	return false;
+}
+
+inline bool IOHandlerBaseI::StartStream()
+{
+	if (!IsOpen)
+		return false;
+	if (IsStreamRunning)
+		return true;
+	if (Start())
+	{
+		IsStreamRunning = true;
+		return true;
+	}
+	return false;
+}
+
+inline bool IOHandlerBaseI::StopStream()
+{
+	if (!IsOpen)
+		return false;
+	if (!IsStreamRunning)
+		return true;
+	if (Stop())
+	{
+		IsStreamRunning = false;
+		return true;
+	}
+	return false;
+}
+
+inline bool IOHandlerBaseI::CloseStream()
+{
+	if (!IsOpen)
+		return false;
+	if (IsStreamRunning)
+		StopStream();
+	if (Close())
+	{
+		IsOpen = false;
+		return true;
+	}
+	return false;
+}
+
 inline std::optional<nosVec2u> IOHandlerBaseI::GetDeltaSeconds() const
 {
-	if (!IsActive)
+	if (!IsOpen)
 		return std::nullopt;
 	return nosVec2u{ (uint32_t)FrameDuration, (uint32_t)TimeScale };
 }

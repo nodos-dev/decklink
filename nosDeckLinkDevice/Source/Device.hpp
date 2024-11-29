@@ -46,6 +46,8 @@ public:
 	// Channels
 	bool OpenOutput(nosDeckLinkChannel channel, BMDDisplayMode displayMode, BMDPixelFormat pixelFormat);
 	bool OpenInput(nosDeckLinkChannel channel, BMDPixelFormat pixelFormat);
+	bool StartStream(nosDeckLinkChannel channel);
+	bool StopStream(nosDeckLinkChannel channel);
 	bool CloseChannel(nosDeckLinkChannel channel);
 	std::optional<nosVec2u> GetCurrentDeltaSecondsOfChannel(nosDeckLinkChannel channel);
 
