@@ -16,7 +16,8 @@ NOS_BEGIN_IMPORT_DEPS()
 NOS_END_IMPORT_DEPS()
 
 #include "nosDeckLinkDevice/nosDeckLinkDevice.h"
-#include "DeckLinkDevice.hpp"
+#include "Device.hpp"
+#include "SubDevice.hpp.hpp"
 #include "DeviceManager.hpp"
 
 namespace nos::decklink

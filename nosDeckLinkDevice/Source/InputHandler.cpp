@@ -1,4 +1,4 @@
-#include "DeckLinkDevice.hpp"
+#include "InputHandler.hpp"
 
 #include <Nodos/Modules.h>
 
@@ -206,11 +206,11 @@ bool InputHandler::Close()
 	if (!IsActive)
 		return false;
 
-	if (S_OK != Interface->PauseStreams())
-		return false;
+	//if (S_OK != Interface->PauseStreams())
+	//	return false;
 
-	if (S_OK != Interface->FlushStreams())
-		return false;
+	//if (S_OK != Interface->FlushStreams())
+	//	return false;
 
 	if (S_OK != Interface->StopStreams())
 		return false;
@@ -225,7 +225,7 @@ bool InputHandler::Close()
 bool InputHandler::WaitFrame(std::chrono::milliseconds timeout)
 {
 	ReadRequestedCond.notify_one();
-	std::unique_lock lock(CanReadMutex);
+	std::unique_lock lock(VideoBufferMutex);
 	CanReadCond.wait_for(lock, timeout);
 	return true;
 }
@@ -242,14 +242,14 @@ void InputHandler::DmaTransfer(void* buffer, size_t size)
 			nosEngine.LogE("DMA Read: Buffer size does not match frame size");
 		}
 		auto copySize = std::min(actualSize, size);
-		std::memcpy(buffer, VideoBuffer.Data(), size);
+		std::memcpy(buffer, VideoBuffer.Data(), copySize);
 	}
 }
 
 void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* frame)
 {
 	{
-		std::unique_lock lock(ReadRequestedMutex);
+		std::unique_lock lock(VideoBufferMutex);
 		ReadRequestedCond.wait_for(lock, std::chrono::milliseconds(100));
 	}
 	{

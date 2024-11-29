@@ -1,4 +1,4 @@
-#include "DeckLinkDevice.hpp"
+#include "OutputHandler.hpp"
 
 #include <Nodos/Modules.h>
 
