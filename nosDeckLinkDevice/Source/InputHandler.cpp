@@ -3,6 +3,7 @@
 #include <Nodos/Modules.h>
 
 #include "EnumConversions.hpp"
+#include "VideoFrame.hpp"
 
 namespace nos::decklink
 {
@@ -194,12 +195,15 @@ void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* 
 	}
 	{
 		std::unique_lock lock(VideoBufferMutex);
-		void* bytes;
-		GetVideoBufferBytes(frame, &bytes);
+		// TODO: Start access here, end it in DmaTransfer instead of this copy.
+		VideoFrame input(frame);
+		input.StartAccess(bmdBufferAccessRead);
+		auto bytes = input.GetBytes();
 		size_t bufSize = frame->GetHeight() * frame->GetRowBytes();
 		if (VideoBuffer.Size() != bufSize)
 			VideoBuffer = nos::Buffer(bufSize);
 		std::memcpy(VideoBuffer.Data(), bytes, bufSize);
+		input.EndAccess();
 	}
 	CanReadCond.notify_one();
 }

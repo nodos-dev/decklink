@@ -2,6 +2,8 @@
 
 #include <Nodos/Modules.h>
 
+#include "VideoFrame.hpp"
+
 namespace nos::decklink
 {
 	
@@ -161,25 +163,26 @@ void OutputHandler::ScheduleNextFrame()
 
 void OutputHandler::DmaTransfer(void* buffer, size_t size)
 {
-	void* videoBufferBytes = nullptr;
-	size_t actualBufferSize;
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		if (WriteQueue.empty())
 			return;
-		auto videoFrame = WriteQueue.front();
-		GetVideoBufferBytes(videoFrame, &videoBufferBytes);
-		actualBufferSize = videoFrame->GetRowBytes() * videoFrame->GetHeight();
-		WriteQueue.pop_front();
-	}
-	if (videoBufferBytes && buffer)
-	{
-		if (size != actualBufferSize)
+		auto frame = WriteQueue.front();
+		VideoFrame output(frame);
+		output.StartAccess(bmdBufferAccessWrite);
+		size_t actualBufferSize = frame->GetRowBytes() * frame->GetHeight();
+		auto videoBufferBytes = output.GetBytes();
+		if (videoBufferBytes && buffer)
 		{
-			nosEngine.LogE("DMA Write: Buffer size does not match frame size");
+			if (size != actualBufferSize)
+			{
+				nosEngine.LogE("DMA Write: Buffer size does not match frame size");
+			}
+			size_t copySize = std::min(size, actualBufferSize);
+			std::memcpy(videoBufferBytes, buffer, copySize);
 		}
-		size_t copySize = std::min(size, actualBufferSize);
-		std::memcpy(videoBufferBytes, buffer, copySize);
+		output.EndAccess();
+		WriteQueue.pop_front();
 	}
 	ScheduleNextFrame();
 }
