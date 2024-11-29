@@ -93,8 +93,8 @@ typedef struct nosDeckLinkSubsystem {
 
 // Make sure these are same with nossys file.
 #define NOS_DECKLINK_DEVICE_SUBSYSTEM_NAME "nos.device.decklink"
-#define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MAJOR 1
-#define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MINOR 0
+#define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MAJOR 0
+#define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MINOR 1
 
 extern struct nosModuleInfo nosDeckLinkSubsystemModuleInfo;
 extern nosDeckLinkSubsystem* nosDeckLink;

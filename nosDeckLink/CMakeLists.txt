@@ -14,10 +14,10 @@ nos_find_sdk("1.3.0" NOS_PLUGIN_SDK_TARGET NOS_SUBSYSTEM_SDK_TARGET NOS_SDK_DIR)
 set(FLATC_EXECUTABLE ${NOS_SDK_DIR}/bin/flatc${CMAKE_EXECUTABLE_SUFFIX})
 
 # nos.device.decklink
-nos_get_module("nos.device.decklink" "1.0" NOS_DEVICE_DECKLINK_TARGET_1_0)
+nos_get_module("nos.device.decklink" "0.1" NOS_DEVICE_DECKLINK_TARGET_0_1)
 
 # nos.sys.mediaio: TODO: Add transitive dependency support to nosman or CMake Nodos toolchain
-nos_get_module("nos.sys.mediaio" "1.0" NOS_SYS_MEDIAIO_TARGET_1_0)
+nos_get_module("nos.sys.mediaio" "0.1" NOS_SYS_MEDIAIO_TARGET_0_1)
 
 # nos.sys.vulkan
 nos_get_module("nos.sys.vulkan" "5.8" NOS_SYS_VULKAN_TARGET_5_8)
@@ -35,7 +35,7 @@ nos_generate_flatbuffers("${NOS_UTILITIES_PATH}/Config" "${CMAKE_CURRENT_SOURCE_
 nos_generate_flatbuffers("${CMAKE_CURRENT_SOURCE_DIR}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Source/Generated" "cpp" "${NOS_SDK_DIR}/types" generated_nosDeckLink)
 
 list(APPEND DEPENDENCIES generated_nosDeckLink_dep_nosMediaIO generated_nosDeckLink_dep_nosUtilities generated_nosDeckLink
-    ${NOS_DEVICE_DECKLINK_TARGET_1_0} ${NOS_SYS_MEDIAIO_TARGET_1_0} ${NOS_SYS_VULKAN_TARGET_5_8} ${NOS_PLUGIN_SDK_TARGET})
+    ${NOS_DEVICE_DECKLINK_TARGET_0_1} ${NOS_SYS_MEDIAIO_TARGET_0_1} ${NOS_SYS_VULKAN_TARGET_5_8} ${NOS_PLUGIN_SDK_TARGET})
 list(APPEND INCLUDE_FOLDERS
     ${EXTERNAL_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/Source
