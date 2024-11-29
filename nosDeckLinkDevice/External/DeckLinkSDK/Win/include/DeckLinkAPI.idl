@@ -72,6 +72,7 @@ library DeckLinkAPI
 
 // Enumeration Mapping
 
+cpp_quote("typedef unsigned int BMDBufferAccessFlags;")
 cpp_quote("typedef unsigned int BMDFrameFlags;")
 cpp_quote("typedef unsigned int BMDVideoInputFlags;")
 cpp_quote("typedef unsigned int BMDVideoInputFormatChangedEvents;")
@@ -81,6 +82,7 @@ cpp_quote("typedef unsigned int BMDAnalogVideoFlags;")
 cpp_quote("typedef unsigned int BMDFormatFlags;")
 cpp_quote("typedef unsigned int BMDDeviceBusyState;")
 cpp_quote("#if 0")
+typedef enum _BMDBufferAccessFlags BMDBufferAccessFlags;
 typedef enum _BMDFrameFlags BMDFrameFlags;
 typedef enum _BMDVideoInputFlags BMDVideoInputFlags;
 typedef enum _BMDVideoInputFormatChangedEvents BMDVideoInputFormatChangedEvents;
@@ -90,6 +92,14 @@ typedef enum _BMDAnalogVideoFlags BMDAnalogVideoFlags;
 typedef enum _BMDFormatFlags BMDFormatFlags;
 typedef enum _BMDDeviceBusyState BMDDeviceBusyState;
 cpp_quote("#endif")
+
+/* Enum BMDBufferAccessFlags - Flags to describe access requirements to a video frame buffer */
+
+[v1_enum] enum _BMDBufferAccessFlags {
+    bmdBufferAccessReadAndWrite                                  = 1 << 0 | 1 << 1,
+    bmdBufferAccessRead                                          = 1 << 0,
+    bmdBufferAccessWrite                                         = 1 << 1
+};
 
 /* Enum BMDVideoOutputFlags - Flags to control the output of ancillary data along with video. */
 
@@ -656,7 +666,8 @@ typedef [v1_enum] enum _BMDNotifications {
 interface IDeckLinkVideoOutputCallback;
 interface IDeckLinkInputCallback;
 interface IDeckLinkEncoderInputCallback;
-interface IDeckLinkMemoryAllocator;
+interface IDeckLinkVideoBufferAllocator;
+interface IDeckLinkVideoBufferAllocatorProvider;
 interface IDeckLinkAudioOutputCallback;
 interface IDeckLinkIterator;
 interface IDeckLinkAPIInformation;
@@ -664,10 +675,12 @@ interface IDeckLinkOutput;
 interface IDeckLinkInput;
 interface IDeckLinkHDMIInputEDID;
 interface IDeckLinkEncoderInput;
+interface IDeckLinkVideoBuffer;
 interface IDeckLinkVideoFrame;
 interface IDeckLinkMutableVideoFrame;
 interface IDeckLinkVideoFrame3DExtensions;
 interface IDeckLinkVideoFrameMetadataExtensions;
+interface IDeckLinkVideoFrameMutableMetadataExtensions;
 interface IDeckLinkVideoInputFrame;
 interface IDeckLinkAncillaryPacket;
 interface IDeckLinkAncillaryPacketIterator;
@@ -699,7 +712,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(20AA5225-1958-47CB-820B-80A8D521A6EE),
+    uuid(5BE6DF26-02CE-433E-99D9-9A87C3AC171F),
     helpstring("Frame completion callback.")
 ] interface IDeckLinkVideoOutputCallback : IUnknown
 {
@@ -711,7 +724,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(C6FCE4C9-C4E4-4047-82FB-5D238232A902),
+    uuid(3A94F075-C37D-4BA8-BCC0-1D778C8F881B),
     helpstring("Frame arrival callback.")
 ] interface IDeckLinkInputCallback : IUnknown
 {
@@ -732,19 +745,28 @@ interface IDeckLinkDiscovery;
     HRESULT AudioPacketArrived ([in] IDeckLinkEncoderAudioPacket* audioPacket);
 };
 
-/* Interface IDeckLinkMemoryAllocator - Memory allocator for video frames. */
+/* Interface IDeckLinkVideoBufferAllocator - Buffer allocator for video. */
 
 [
     object,
-    uuid(B36EB6E7-9D29-4AA8-92EF-843B87A289E8),
+    uuid(3481A4DF-2B11-4E55-AC61-836B87985E9A),
     local,
-    helpstring("Memory allocator for video frames.")
-] interface IDeckLinkMemoryAllocator : IUnknown
+    helpstring("Buffer allocator for video.")
+] interface IDeckLinkVideoBufferAllocator : IUnknown
 {
-    HRESULT AllocateBuffer ([in] unsigned int bufferSize, [out] void** allocatedBuffer);
-    HRESULT ReleaseBuffer ([in] void* buffer);
-    HRESULT Commit (void);
-    HRESULT Decommit (void);
+    HRESULT AllocateVideoBuffer ([out] IDeckLinkVideoBuffer** allocatedBuffer);
+};
+
+/* Interface IDeckLinkVideoBufferAllocatorProvider - Allows EnableVideoInputWithAllocatorProvider to obtain allocators */
+
+[
+    object,
+    uuid(08B80403-BFF2-49D0-B448-8C908B9E9FC9),
+    local,
+    helpstring("Allows EnableVideoInputWithAllocatorProvider to obtain allocators")
+] interface IDeckLinkVideoBufferAllocatorProvider : IUnknown
+{
+    HRESULT GetVideoBufferAllocator ([in] unsigned int bufferSize, [in] unsigned int width, [in] unsigned int height, [in] unsigned int rowBytes, [in] BMDPixelFormat pixelFormat, [out] IDeckLinkVideoBufferAllocator** allocator);
 };
 
 /* Interface IDeckLinkAudioOutputCallback - Optional callback to allow audio samples to be pulled as required. */
@@ -788,7 +810,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(BE2D9020-461E-442F-84B7-E949CB953B9D),
+    uuid(1A8077F1-9FE2-4533-8147-2294305E253F),
     local,
     helpstring("Created by QueryInterface from IDeckLink.")
 ] interface IDeckLinkOutput : IUnknown
@@ -802,8 +824,9 @@ interface IDeckLinkDiscovery;
 
     HRESULT EnableVideoOutput ([in] BMDDisplayMode displayMode, [in] BMDVideoOutputFlags flags);
     HRESULT DisableVideoOutput (void);
-    HRESULT SetVideoOutputFrameMemoryAllocator ([in] IDeckLinkMemoryAllocator* theAllocator);
     HRESULT CreateVideoFrame ([in] int width, [in] int height, [in] int rowBytes, [in] BMDPixelFormat pixelFormat, [in] BMDFrameFlags flags, [out] IDeckLinkMutableVideoFrame** outFrame);
+    HRESULT CreateVideoFrameWithBuffer ([in] int width, [in] int height, [in] int rowBytes, [in] BMDPixelFormat pixelFormat, [in] BMDFrameFlags flags, [in] IDeckLinkVideoBuffer* buffer, [out] IDeckLinkMutableVideoFrame** outFrame);
+    HRESULT RowBytesForPixelFormat ([in] BMDPixelFormat pixelFormat, [in] int width, [out] int* rowBytes);
     HRESULT CreateAncillaryData ([in] BMDPixelFormat pixelFormat, [out] IDeckLinkVideoFrameAncillary** outBuffer);	// Use of IDeckLinkVideoFrameAncillaryPackets is preferred
     HRESULT DisplayVideoFrameSync ([in] IDeckLinkVideoFrame* theFrame);
     HRESULT ScheduleVideoFrame ([in] IDeckLinkVideoFrame* theFrame, [in] BMDTimeValue displayTime, [in] BMDTimeValue displayDuration, [in] BMDTimeScale timeScale);
@@ -840,7 +863,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(C21CDB6E-F414-46E4-A636-80A566E0ED37),
+    uuid(4095DB82-E294-4B8C-AAA8-3B9E80C49336),
     helpstring("Created by QueryInterface from IDeckLink.")
 ] interface IDeckLinkInput : IUnknown
 {
@@ -852,9 +875,9 @@ interface IDeckLinkDiscovery;
     /* Video Input */
 
     HRESULT EnableVideoInput ([in] BMDDisplayMode displayMode, [in] BMDPixelFormat pixelFormat, [in] BMDVideoInputFlags flags);
+    HRESULT EnableVideoInputWithAllocatorProvider ([in] BMDDisplayMode displayMode, [in] BMDPixelFormat pixelFormat, [in] BMDVideoInputFlags flags, [in] IDeckLinkVideoBufferAllocatorProvider* allocatorProvider);
     HRESULT DisableVideoInput (void);
     HRESULT GetAvailableVideoFrameCount ([out] unsigned int* availableFrameCount);
-    HRESULT SetVideoInputFrameMemoryAllocator ([in] IDeckLinkMemoryAllocator* theAllocator);
 
     /* Audio Input */
 
@@ -892,7 +915,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(F222551D-13DF-4FD8-B587-9D4F19EC12C9),
+    uuid(46C1332E-6FD9-472A-8591-FE59C22192E1),
     helpstring("Created by QueryInterface from IDeckLink.")
 ] interface IDeckLinkEncoderInput : IUnknown
 {
@@ -905,7 +928,6 @@ interface IDeckLinkDiscovery;
     HRESULT EnableVideoInput ([in] BMDDisplayMode displayMode, [in] BMDPixelFormat pixelFormat, [in] BMDVideoInputFlags flags);
     HRESULT DisableVideoInput (void);
     HRESULT GetAvailablePacketsCount ([out] unsigned int* availablePacketsCount);
-    HRESULT SetMemoryAllocator ([in] IDeckLinkMemoryAllocator* theAllocator);
 
     /* Audio Input */
 
@@ -926,11 +948,25 @@ interface IDeckLinkDiscovery;
     HRESULT GetHardwareReferenceClock ([in] BMDTimeScale desiredTimeScale, [out] BMDTimeValue* hardwareTime, [out] BMDTimeValue* timeInFrame, [out] BMDTimeValue* ticksPerFrame);
 };
 
+/* Interface IDeckLinkVideoBuffer - Interface to encapsulate a video frame buffer; can be caller-implemented. */
+
+[
+    object,
+    uuid(CCB4B64A-5C86-4E02-B778-885D352709FE),
+    local,
+    helpstring("Interface to encapsulate a video frame buffer; can be caller-implemented.")
+] interface IDeckLinkVideoBuffer : IUnknown
+{
+    HRESULT GetBytes ([out] void** buffer);
+    HRESULT StartAccess ([in] BMDBufferAccessFlags flags);
+    HRESULT EndAccess ([in] BMDBufferAccessFlags flags);
+};
+
 /* Interface IDeckLinkVideoFrame - Interface to encapsulate a video frame; can be caller-implemented. */
 
 [
     object,
-    uuid(3F716FE0-F023-4111-BE5D-EF4414C05B17),
+    uuid(6502091C-615F-4F51-BAF6-45C4256DD5B0),
     local,
     helpstring("Interface to encapsulate a video frame; can be caller-implemented.")
 ] interface IDeckLinkVideoFrame : IUnknown
@@ -940,7 +976,6 @@ interface IDeckLinkDiscovery;
     long GetRowBytes (void);
     BMDPixelFormat GetPixelFormat (void);
     BMDFrameFlags GetFlags (void);
-    HRESULT GetBytes ([out] void** buffer);
     HRESULT GetTimecode ([in] BMDTimecodeFormat format, [out] IDeckLinkTimecode** timecode);
     HRESULT GetAncillaryData ([out] IDeckLinkVideoFrameAncillary** ancillary);	// Use of IDeckLinkVideoFrameAncillaryPackets is preferred
 };
@@ -949,7 +984,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(69E2639F-40DA-4E19-B6F2-20ACE815C390),
+    uuid(CF9EB134-0374-4C5B-95FA-1EC14819FF62),
     local,
     helpstring("Created by IDeckLinkOutput::CreateVideoFrame.")
 ] interface IDeckLinkMutableVideoFrame : IDeckLinkVideoFrame
@@ -959,28 +994,29 @@ interface IDeckLinkDiscovery;
     HRESULT SetTimecodeFromComponents ([in] BMDTimecodeFormat format, [in] unsigned char hours, [in] unsigned char minutes, [in] unsigned char seconds, [in] unsigned char frames, [in] BMDTimecodeFlags flags);
     HRESULT SetAncillaryData ([in] IDeckLinkVideoFrameAncillary* ancillary);
     HRESULT SetTimecodeUserBits ([in] BMDTimecodeFormat format, [in] BMDTimecodeUserBits userBits);
+    HRESULT SetInterfaceProvider ([in] REFIID iid, [in] IUnknown* iface);
 };
 
-/* Interface IDeckLinkVideoFrame3DExtensions - Optional interface implemented on IDeckLinkVideoFrame to support 3D frames */
+/* Interface IDeckLinkVideoFrame3DExtensions - Optional interface to support 3D frames. */
 
 [
     object,
-    uuid(DA0F7E4A-EDC7-48A8-9CDD-2DB51C729CD7),
+    uuid(D4DBE9C6-B4D2-49D3-ABF2-B4E86C7391B0),
     local,
-    helpstring("Optional interface implemented on IDeckLinkVideoFrame to support 3D frames")
+    helpstring("Optional interface to support 3D frames.")
 ] interface IDeckLinkVideoFrame3DExtensions : IUnknown
 {
     BMDVideo3DPackingFormat Get3DPackingFormat (void);
     HRESULT GetFrameForRightEye ([out] IDeckLinkVideoFrame** rightEyeFrame);
 };
 
-/* Interface IDeckLinkVideoFrameMetadataExtensions - Optional interface implemented on IDeckLinkVideoFrame to support frame metadata such as HDR information */
+/* Interface IDeckLinkVideoFrameMetadataExtensions - Get frame metadata */
 
 [
     object,
     uuid(E232A5B7-4DB4-44C9-9152-F47C12E5F051),
     local,
-    helpstring("Optional interface implemented on IDeckLinkVideoFrame to support frame metadata such as HDR information")
+    helpstring("Get frame metadata")
 ] interface IDeckLinkVideoFrameMetadataExtensions : IUnknown
 {
     HRESULT GetInt ([in] BMDDeckLinkFrameMetadataID metadataID, [out] LONGLONG* value);
@@ -990,11 +1026,27 @@ interface IDeckLinkDiscovery;
     HRESULT GetBytes ([in] BMDDeckLinkFrameMetadataID metadataID, [out] void* buffer /* optional */, [in, out] unsigned int* bufferSize);
 };
 
+/* Interface IDeckLinkVideoFrameMutableMetadataExtensions - Set frame metadata */
+
+[
+    object,
+    uuid(CC198FC6-8298-4419-942D-8357EC355E58),
+    local,
+    helpstring("Set frame metadata")
+] interface IDeckLinkVideoFrameMutableMetadataExtensions : IDeckLinkVideoFrameMetadataExtensions
+{
+    HRESULT SetInt ([in] BMDDeckLinkFrameMetadataID metadataID, [in] LONGLONG value);
+    HRESULT SetFloat ([in] BMDDeckLinkFrameMetadataID metadataID, [in] double value);
+    HRESULT SetFlag ([in] BMDDeckLinkFrameMetadataID metadataID, [in] BOOL value);
+    HRESULT SetString ([in] BMDDeckLinkFrameMetadataID metadataID, [in] BSTR value);
+    HRESULT SetBytes ([in] BMDDeckLinkFrameMetadataID metadataID, [in] void* buffer, [in] unsigned int bufferSize);
+};
+
 /* Interface IDeckLinkVideoInputFrame - Provided by the IDeckLinkVideoInput frame arrival callback. */
 
 [
     object,
-    uuid(05CFE374-537C-4094-9A57-680525118F44),
+    uuid(C9ADD3D2-BE52-488D-AB2D-7FDEF7AF0C95),
     local,
     helpstring("Provided by the IDeckLinkVideoInput frame arrival callback.")
 ] interface IDeckLinkVideoInputFrame : IDeckLinkVideoFrame
@@ -1132,7 +1184,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(B1D3F49A-85FE-4C5D-95C8-0B5D5DCCD438),
+    uuid(D4FA2345-9FBA-4497-95C3-C0C3CED3CDA8),
     local,
     helpstring("Screen preview callback")
 ] interface IDeckLinkScreenPreviewCallback : IUnknown
@@ -1144,7 +1196,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(504E2209-CAC7-4C1A-9FB4-C5BB6274D22F),
+    uuid(CEB778E2-C202-4EC8-9085-0CD285CC5522),
     local,
     helpstring("Created with CoCreateInstance on platforms with native COM support or from CreateOpenGLScreenPreviewHelper/CreateOpenGL3ScreenPreviewHelper on other platforms.")
 ] interface IDeckLinkGLScreenPreviewHelper : IUnknown
@@ -1162,7 +1214,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(2094B522-D1A1-40C0-9AC7-1C012218EF02),
+    uuid(F2DD78CA-2921-4AC2-B5BC-BFDCC2035A1F),
     local,
     helpstring("Created with CoCreateInstance.")
 ] interface IDeckLinkDX9ScreenPreviewHelper : IUnknown
@@ -1177,7 +1229,7 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(AD8EC84A-7DDE-11E9-8F9E-2A86E4085A59),
+    uuid(C59346CD-9326-4266-AC2D-5C190F5799EE),
     local,
     helpstring("Created with CoCreateInstance().")
 ] interface IDeckLinkWPFDX9ScreenPreviewHelper : IUnknown
@@ -1317,12 +1369,13 @@ interface IDeckLinkDiscovery;
 
 [
     object,
-    uuid(3BBCB8A2-DA2C-42D9-B5D8-88083644E99A),
+    uuid(A48755D9-8BD5-4727-A1E9-069FDEDBA6E9),
     local,
     helpstring("Created with CoCreateInstance.")
 ] interface IDeckLinkVideoConversion : IUnknown
 {
     HRESULT ConvertFrame ([in] IDeckLinkVideoFrame* srcFrame, [in] IDeckLinkVideoFrame* dstFrame);
+    HRESULT ConvertNewFrame ([in] IDeckLinkVideoFrame* srcFrame, [in] BMDPixelFormat dstPixelFormat, [in] BMDColorspace dstColorspace, [in] IDeckLinkVideoBuffer* dstBuffer, [out] IDeckLinkVideoFrame** dstFrame);
 };
 
 /* Interface IDeckLinkDeviceNotificationCallback - DeckLink device arrival/removal notification callbacks */
@@ -1370,7 +1423,7 @@ importlib("stdole2.tlb");
 };
 
 [
-    uuid(F63E77C7-B655-4A4A-9AD0-3CA85D394343),
+    uuid(1E332DAE-0D04-49EB-B8A1-B6E00B2B6BD0),
     helpstring("CDeckLinkGLScreenPreviewHelper Class")
 ] coclass CDeckLinkGLScreenPreviewHelper
 {
@@ -1378,7 +1431,7 @@ importlib("stdole2.tlb");
 };
 
 [
-    uuid(00696A71-EBC7-491F-AC02-18D3393F33F0),
+    uuid(166804E4-15EF-4BFD-B623-B5BA921667C5),
     helpstring("CDeckLinkGL3ScreenPreviewHelper Class. Requires OpenGL 3.2 support and provides improved performance and color handling")
 ] coclass CDeckLinkGL3ScreenPreviewHelper
 {
@@ -1386,7 +1439,7 @@ importlib("stdole2.tlb");
 };
 
 [
-    uuid(CC010023-E01D-4525-9D59-80C8AB3DC7A0),
+    uuid(0EB111ED-ADA6-43A6-8B16-CA5D27EEA15E),
     helpstring("CDeckLinkDX9ScreenPreviewHelper Class")
 ] coclass CDeckLinkDX9ScreenPreviewHelper
 {
@@ -1394,7 +1447,7 @@ importlib("stdole2.tlb");
 };
 
 [
-    uuid(EF2A8478-7DDF-11E9-8F9E-2A86E4085A59),
+    uuid(5E64496D-4BB2-45D5-9B63-BF1B463B18AF),
     helpstring("CDeckLinkWPFDX9ScreenPreviewHelper Class")
 ] coclass CDeckLinkWPFDX9ScreenPreviewHelper
 {
@@ -1402,7 +1455,7 @@ importlib("stdole2.tlb");
 };
 
 [
-    uuid(7DBBBB11-5B7B-467D-AEA4-CEA468FD368C),
+    uuid(89BA47BD-1FE2-4D76-9BFE-DE85049C4987),
     helpstring("CDeckLinkVideoConversion Class")
 ] coclass CDeckLinkVideoConversion
 {
@@ -1427,6 +1480,7 @@ importlib("stdole2.tlb");
 
 // import deprecated interfaces
 
+#include "DeckLinkAPI_v14_2_1.idl"
 #include "DeckLinkAPI_v11_5_1.idl"
 #include "DeckLinkAPI_v10_11.idl"
 #include "DeckLinkAPI_v10_9.idl"
@@ -1438,12 +1492,4 @@ importlib("stdole2.tlb");
 #include "DeckLinkAPI_v10_8.idl"
 #include "DeckLinkAPI_v10_6.idl"
 #include "DeckLinkAPI_v10_5.idl"
-#include "DeckLinkAPI_v9_9.idl"
-#include "DeckLinkAPI_v9_2.idl"
-#include "DeckLinkAPI_v8_1.idl"
-#include "DeckLinkAPI_v8_0.idl"
-#include "DeckLinkAPI_v7_9.idl"
-#include "DeckLinkAPI_v7_6.idl"
-#include "DeckLinkAPI_v7_3.idl"
-#include "DeckLinkAPI_v7_1.idl"
 };

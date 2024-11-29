@@ -60,7 +60,7 @@ typedef [v1_enum] enum	_BMDDeckLinkStatusID_v11_5_1 {
 ] interface IDeckLinkInputCallback_v11_5_1 : IUnknown
 {
     HRESULT VideoInputFormatChanged ([in] BMDVideoInputFormatChangedEvents notificationEvents, [in] IDeckLinkDisplayMode* newDisplayMode, [in] BMDDetectedVideoInputFormatFlags detectedSignalFlags);
-    HRESULT VideoInputFrameArrived ([in] IDeckLinkVideoInputFrame* videoFrame, [in] IDeckLinkAudioInputPacket* audioPacket);
+    HRESULT VideoInputFrameArrived ([in] IDeckLinkVideoInputFrame_v14_2_1* videoFrame, [in] IDeckLinkAudioInputPacket* audioPacket);
 };
 
 /* Interface IDeckLinkInput_v11_5_1 - Created by QueryInterface from IDeckLink. */
@@ -74,14 +74,14 @@ typedef [v1_enum] enum	_BMDDeckLinkStatusID_v11_5_1 {
     HRESULT DoesSupportVideoMode ([in] BMDVideoConnection connection /* If a value of bmdVideoConnectionUnspecified is specified, the caller does not care about the connection */, [in] BMDDisplayMode requestedMode, [in] BMDPixelFormat requestedPixelFormat, [in] BMDVideoInputConversionMode conversionMode, [in] BMDSupportedVideoModeFlags flags, [out] BMDDisplayMode* actualMode, [out] BOOL* supported);
     HRESULT GetDisplayMode ([in] BMDDisplayMode displayMode, [out] IDeckLinkDisplayMode** resultDisplayMode);
     HRESULT GetDisplayModeIterator ([out] IDeckLinkDisplayModeIterator** iterator);
-    HRESULT SetScreenPreviewCallback ([in] IDeckLinkScreenPreviewCallback* previewCallback);
+    HRESULT SetScreenPreviewCallback ([in] IDeckLinkScreenPreviewCallback_v14_2_1* previewCallback);
 
     /* Video Input */
 
     HRESULT EnableVideoInput ([in] BMDDisplayMode displayMode, [in] BMDPixelFormat pixelFormat, [in] BMDVideoInputFlags flags);
     HRESULT DisableVideoInput (void);
     HRESULT GetAvailableVideoFrameCount ([out] unsigned int* availableFrameCount);
-    HRESULT SetVideoInputFrameMemoryAllocator ([in] IDeckLinkMemoryAllocator* theAllocator);
+    HRESULT SetVideoInputFrameMemoryAllocator ([in] IDeckLinkMemoryAllocator_v14_2_1* theAllocator);
 
     /* Audio Input */
 

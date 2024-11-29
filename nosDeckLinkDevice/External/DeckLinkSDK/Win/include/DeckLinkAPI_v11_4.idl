@@ -53,18 +53,18 @@
     HRESULT DoesSupportVideoMode ([in] BMDVideoConnection connection /* If a value of 0 is specified, the caller does not care about the connection */, [in] BMDDisplayMode requestedMode, [in] BMDPixelFormat requestedPixelFormat, [in] BMDSupportedVideoModeFlags flags, [out] BMDDisplayMode* actualMode, [out] BOOL* supported);
     HRESULT GetDisplayMode ([in] BMDDisplayMode displayMode, [out] IDeckLinkDisplayMode** resultDisplayMode);
     HRESULT GetDisplayModeIterator ([out] IDeckLinkDisplayModeIterator** iterator);
-    HRESULT SetScreenPreviewCallback ([in] IDeckLinkScreenPreviewCallback* previewCallback);
+    HRESULT SetScreenPreviewCallback ([in] IDeckLinkScreenPreviewCallback_v14_2_1* previewCallback);
 
     /* Video Output */
 
     HRESULT EnableVideoOutput ([in] BMDDisplayMode displayMode, [in] BMDVideoOutputFlags flags);
     HRESULT DisableVideoOutput (void);
-    HRESULT SetVideoOutputFrameMemoryAllocator ([in] IDeckLinkMemoryAllocator* theAllocator);
-    HRESULT CreateVideoFrame ([in] int width, [in] int height, [in] int rowBytes, [in] BMDPixelFormat pixelFormat, [in] BMDFrameFlags flags, [out] IDeckLinkMutableVideoFrame** outFrame);
+    HRESULT SetVideoOutputFrameMemoryAllocator ([in] IDeckLinkMemoryAllocator_v14_2_1* theAllocator);
+    HRESULT CreateVideoFrame ([in] int width, [in] int height, [in] int rowBytes, [in] BMDPixelFormat pixelFormat, [in] BMDFrameFlags flags, [out] IDeckLinkMutableVideoFrame_v14_2_1** outFrame);
     HRESULT CreateAncillaryData ([in] BMDPixelFormat pixelFormat, [out] IDeckLinkVideoFrameAncillary** outBuffer);	// Use of IDeckLinkVideoFrameAncillaryPackets is preferred
-    HRESULT DisplayVideoFrameSync ([in] IDeckLinkVideoFrame* theFrame);
-    HRESULT ScheduleVideoFrame ([in] IDeckLinkVideoFrame* theFrame, [in] BMDTimeValue displayTime, [in] BMDTimeValue displayDuration, [in] BMDTimeScale timeScale);
-    HRESULT SetScheduledFrameCompletionCallback ([in] IDeckLinkVideoOutputCallback* theCallback);
+    HRESULT DisplayVideoFrameSync ([in] IDeckLinkVideoFrame_v14_2_1* theFrame);
+    HRESULT ScheduleVideoFrame ([in] IDeckLinkVideoFrame_v14_2_1* theFrame, [in] BMDTimeValue displayTime, [in] BMDTimeValue displayDuration, [in] BMDTimeScale timeScale);
+    HRESULT SetScheduledFrameCompletionCallback ([in] IDeckLinkVideoOutputCallback_v14_2_1* theCallback);
     HRESULT GetBufferedVideoFrameCount ([out] unsigned int* bufferedFrameCount);
 
     /* Audio Output */
@@ -90,7 +90,7 @@
     /* Hardware Timing */
 
     HRESULT GetHardwareReferenceClock ([in] BMDTimeScale desiredTimeScale, [out] BMDTimeValue* hardwareTime, [out] BMDTimeValue* timeInFrame, [out] BMDTimeValue* ticksPerFrame);
-    HRESULT GetFrameCompletionReferenceTimestamp ([in] IDeckLinkVideoFrame* theFrame, [in] BMDTimeScale desiredTimeScale, [out] BMDTimeValue* frameCompletionTimestamp);
+    HRESULT GetFrameCompletionReferenceTimestamp ([in] IDeckLinkVideoFrame_v14_2_1* theFrame, [in] BMDTimeScale desiredTimeScale, [out] BMDTimeValue* frameCompletionTimestamp);
 };
 
 /* Interface IDeckLinkInput_v11_4 - Created by QueryInterface from IDeckLink. */
@@ -104,14 +104,14 @@
     HRESULT DoesSupportVideoMode ([in] BMDVideoConnection connection /* If a value of 0 is specified, the caller does not care about the connection */, [in] BMDDisplayMode requestedMode, [in] BMDPixelFormat requestedPixelFormat, [in] BMDSupportedVideoModeFlags flags, [out] BOOL* supported);
     HRESULT GetDisplayMode ([in] BMDDisplayMode displayMode, [out] IDeckLinkDisplayMode** resultDisplayMode);
     HRESULT GetDisplayModeIterator ([out] IDeckLinkDisplayModeIterator** iterator);
-    HRESULT SetScreenPreviewCallback ([in] IDeckLinkScreenPreviewCallback* previewCallback);
+    HRESULT SetScreenPreviewCallback ([in] IDeckLinkScreenPreviewCallback_v14_2_1* previewCallback);
 
     /* Video Input */
 
     HRESULT EnableVideoInput ([in] BMDDisplayMode displayMode, [in] BMDPixelFormat pixelFormat, [in] BMDVideoInputFlags flags);
     HRESULT DisableVideoInput (void);
     HRESULT GetAvailableVideoFrameCount ([out] unsigned int* availableFrameCount);
-    HRESULT SetVideoInputFrameMemoryAllocator ([in] IDeckLinkMemoryAllocator* theAllocator);
+    HRESULT SetVideoInputFrameMemoryAllocator ([in] IDeckLinkMemoryAllocator_v14_2_1* theAllocator);
 
     /* Audio Input */
 
