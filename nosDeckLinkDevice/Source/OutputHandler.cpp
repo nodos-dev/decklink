@@ -161,25 +161,25 @@ void OutputHandler::ScheduleNextFrame()
 
 void OutputHandler::DmaTransfer(void* buffer, size_t size)
 {
-	void* frameBytes = nullptr;
+	void* videoBufferBytes = nullptr;
 	size_t actualBufferSize;
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		if (WriteQueue.empty())
 			return;
-		auto frameBuffer = WriteQueue.front();
-		frameBuffer->GetBytes(&frameBytes);
-		actualBufferSize = frameBuffer->GetRowBytes() * frameBuffer->GetHeight();
+		auto videoFrame = WriteQueue.front();
+		GetVideoBufferBytes(videoFrame, &videoBufferBytes);
+		actualBufferSize = videoFrame->GetRowBytes() * videoFrame->GetHeight();
 		WriteQueue.pop_front();
 	}
-	if (frameBytes && buffer)
+	if (videoBufferBytes && buffer)
 	{
 		if (size != actualBufferSize)
 		{
 			nosEngine.LogE("DMA Write: Buffer size does not match frame size");
 		}
 		size_t copySize = std::min(size, actualBufferSize);
-		std::memcpy(frameBytes, buffer, copySize);
+		std::memcpy(videoBufferBytes, buffer, copySize);
 	}
 	ScheduleNextFrame();
 }

@@ -195,7 +195,7 @@ void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* 
 	{
 		std::unique_lock lock(VideoBufferMutex);
 		void* bytes;
-		frame->GetBytes(&bytes);
+		GetVideoBufferBytes(frame, &bytes);
 		size_t bufSize = frame->GetHeight() * frame->GetRowBytes();
 		if (VideoBuffer.Size() != bufSize)
 			VideoBuffer = nos::Buffer(bufSize);

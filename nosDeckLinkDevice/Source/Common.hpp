@@ -125,4 +125,18 @@ inline std::optional<nosVec2u> IOHandlerBaseI::GetDeltaSeconds() const
 		return std::nullopt;
 	return nosVec2u{ (uint32_t)FrameDuration, (uint32_t)TimeScale };
 }
+
+inline bool GetVideoBufferBytes(IDeckLinkVideoFrame* frame, void** buffer)
+{
+	IDeckLinkVideoBuffer* videoBuffer = nullptr;
+	auto res = frame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer);
+	if (res != S_OK)
+		return false;
+	res = videoBuffer->GetBytes(buffer);
+	Release(videoBuffer);
+	if (res != S_OK)
+		return false;
+	return true;
+}
+
 }
