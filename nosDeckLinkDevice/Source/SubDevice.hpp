@@ -2,6 +2,11 @@
 
 #include "Common.hpp"
 
+#include "OutputHandler.hpp"
+#include "InputHandler.hpp"
+
+#include <nosMediaIO/nosMediaIO.h>
+
 namespace nos::decklink
 {
 class SubDevice

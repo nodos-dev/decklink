@@ -7,6 +7,7 @@
 #include <mutex>
 
 #include "Common.hpp"
+#include "SubDevice.hpp"
 
 // Nodos
 #include <Nodos/Types.h>
@@ -18,8 +19,6 @@ namespace nos::decklink
 {
 
 std::vector<std::unique_ptr<class Device>> InitializeDevices();
-
-class SubDevice;
 
 class Device
 {

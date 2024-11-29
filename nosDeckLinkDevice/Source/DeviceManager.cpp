@@ -2,7 +2,7 @@
 
 #include <Nodos/Modules.h>
 
-#include "DeckLinkDevice.hpp"
+#include "Device.hpp"
 
 namespace nos::decklink
 {

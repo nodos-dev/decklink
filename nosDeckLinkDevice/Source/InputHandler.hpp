@@ -20,6 +20,7 @@ struct InputHandler : IOHandlerBase<IDeckLinkInput>
 	void DmaTransfer(void* buffer, size_t size) override;
 
 	void OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* frame);
+	void OnInputVideoModeChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat);
 };
 
 }

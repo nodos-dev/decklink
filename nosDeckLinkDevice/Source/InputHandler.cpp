@@ -24,111 +24,56 @@ public:
 		BMDVideoInputFlags  videoInputFlags = bmdVideoInputEnableFormatDetection;
 		
 		// // Check for video field changes
-		// if (notificationEvents & bmdVideoInputFieldDominanceChanged)
-		// {
-		//     BMDFieldDominance fieldDominance;
-		//     
-		//     fieldDominance = newDisplayMode->GetFieldDominance();
-		//     printf("Input field dominance changed to ");
-		//     switch (fieldDominance) {
-		//         case bmdUnknownFieldDominance:
-		//             printf("unknown\n");
-		//             break;
-		//         case bmdLowerFieldFirst:
-		//             printf("lower field first\n");
-		//             break;
-		//         case bmdUpperFieldFirst:
-		//             printf("upper field first\n");
-		//             break;
-		//         case bmdProgressiveFrame:
-		//             printf("progressive\n");
-		//             break;
-		//         case bmdProgressiveSegmentedFrame:
-		//             printf("progressive segmented frame\n");
-		//             break;
-		//         default:
-		//             printf("\n");
-		//             return E_FAIL;
-		//     }
-		// }
-		//
-		// // Check if the pixel format has changed
-		// if (notificationEvents & bmdVideoInputColorspaceChanged)
-		// {
-		//     printf("Input color space changed to ");
-		//     if (detectedSignalFlags & bmdDetectedVideoInputYCbCr422)
-		//     {
-		//         printf("YCbCr422 ");
-		//         if (detectedSignalFlags & bmdDetectedVideoInput8BitDepth)
-		//         {
-		//             printf("8-bit depth\n");
-		//             pixelFormat = bmdFormat8BitYUV;
-		//         }
-		//         else if (detectedSignalFlags & bmdDetectedVideoInput10BitDepth)
-		//         {
-		//             printf("10-bit depth\n");
-		//             pixelFormat = bmdFormat10BitYUV;
-		//         }
-		//         else
-		//         {
-		//             printf("\n");
-		//             return E_FAIL;
-		//         }
-		//     }
-		//     else if (detectedSignalFlags & bmdDetectedVideoInputRGB444)
-		//     {
-		//         printf("RGB444 ");
-		//         if (detectedSignalFlags & bmdDetectedVideoInput8BitDepth)
-		//         {
-		//             printf("8-bit depth\n");
-		//             pixelFormat = bmdFormat8BitARGB;
-		//         }
-		//         else if (detectedSignalFlags & bmdDetectedVideoInput10BitDepth)
-		//         {
-		//             printf("10-bit depth\n");
-		//             pixelFormat = bmdFormat10BitRGB;
-		//         }
-		//         else if (detectedSignalFlags & bmdDetectedVideoInput12BitDepth)
-		//         {
-		//             printf("12-bit depth\n");
-		//             pixelFormat = bmdFormat12BitRGB;
-		//         }
-		//         else
-		//         {
-		//             printf("\n");
-		//             return E_FAIL;
-		//         }
-		//     }
-		// }
+		if (notificationEvents & bmdVideoInputFieldDominanceChanged)
+		{
+		    BMDFieldDominance fieldDominance = newDisplayMode->GetFieldDominance();
+		}
 		
-		// // Check if the video mode has changed
-		// if (notificationEvents & bmdVideoInputDisplayModeChanged)
-		// {
-		//     std::string modeName;
-		//     
-		//     // Obtain the name of the video mode 
-		//     if (newDisplayMode->GetName(&displayModeString) == S_OK)
-		//     {
-		//         StringToStdString(displayModeString, modeName);
-		//         
-		//         printf("Input display mode changed to: %s", modeName.c_str());
-		//         
-		//         if (detectedSignalFlags & bmdDetectedVideoInputDualStream3D)
-		//         {
-		//             videoInputFlags |= bmdVideoInputDualStream3D;
-		//             printf(" (3D)");
-		//         }
-		//         printf("\n");
-		//         
-		//         // Release the video mode name string
-		//         STRINGFREE(displayModeString);
-		//     }
-		// }
+		// Check if the pixel format has changed
+		if (notificationEvents & bmdVideoInputColorspaceChanged)
+		{
+		    if (detectedSignalFlags & bmdDetectedVideoInputYCbCr422)
+		    {
+		        if (detectedSignalFlags & bmdDetectedVideoInput8BitDepth)
+		            pixelFormat = bmdFormat8BitYUV;
+		        else if (detectedSignalFlags & bmdDetectedVideoInput10BitDepth)
+		            pixelFormat = bmdFormat10BitYUV;
+		        else
+		            return E_FAIL;
+		    }
+		    else if (detectedSignalFlags & bmdDetectedVideoInputRGB444)
+		    {
+		        if (detectedSignalFlags & bmdDetectedVideoInput8BitDepth)
+		            pixelFormat = bmdFormat8BitARGB;
+		        else if (detectedSignalFlags & bmdDetectedVideoInput10BitDepth)
+		            pixelFormat = bmdFormat10BitRGB;
+		        else if (detectedSignalFlags & bmdDetectedVideoInput12BitDepth)
+		            pixelFormat = bmdFormat12BitRGB;
+		        else
+		        {
+		            return E_FAIL;
+		        }
+		    }
+		}
+		
+		// Check if the video mode has changed
+		if (notificationEvents & bmdVideoInputDisplayModeChanged)
+		{
+		    // Obtain the name of the video mode
+			dlstring_t displayModeString;
+		    if (newDisplayMode->GetName(&displayModeString) == S_OK)
+		    {
+		        std::string modeName = DlToStdString(displayModeString);
+		        if (detectedSignalFlags & bmdDetectedVideoInputDualStream3D)
+		            videoInputFlags |= bmdVideoInputDualStream3D;
+		        // Release the video mode name string
+		        DeleteString(displayModeString);
+		    }
+		}
 		
 		if (notificationEvents & (bmdVideoInputDisplayModeChanged | bmdVideoInputColorspaceChanged))
 		{
-			Input->Close();
-			Input->Open(newDisplayMode->GetDisplayMode(), pixelFormat);
+			Input->OnInputVideoModeChanged_DeckLinkThread(newDisplayMode->GetDisplayMode(), pixelFormat);
 		}
 		
 		return S_OK;
@@ -171,7 +116,7 @@ bool InputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 		return false;
 	}
 	Release(callback);
-	res = Interface->EnableVideoInput(displayMode, pixelFormat, bmdVideoInputFlagDefault);
+	res = Interface->EnableVideoInput(displayMode, pixelFormat, bmdVideoInputEnableFormatDetection);
 	if (res != S_OK)
 	{
 		nosEngine.LogE("Could not enable video input - result = %08x", res);
@@ -205,12 +150,6 @@ bool InputHandler::Close()
 {
 	if (!IsActive)
 		return false;
-
-	//if (S_OK != Interface->PauseStreams())
-	//	return false;
-
-	//if (S_OK != Interface->FlushStreams())
-	//	return false;
 
 	if (S_OK != Interface->StopStreams())
 		return false;
@@ -262,5 +201,21 @@ void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* 
 		std::memcpy(VideoBuffer.Data(), bytes, bufSize);
 	}
 	CanReadCond.notify_one();
+}
+
+void InputHandler::OnInputVideoModeChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat)
+{
+	nosEngine.LogW("Input signal changed");
+	// Pause video capture
+	Interface->PauseStreams();
+            
+	// Enable video input with the properties of the new video stream
+	Interface->EnableVideoInput(newDisplayMode, pixelFormat, bmdVideoInputEnableFormatDetection);
+
+	// Flush any queued video frames
+	Interface->FlushStreams();
+
+	// Start video capture
+	Interface->StartStreams();
 }
 }

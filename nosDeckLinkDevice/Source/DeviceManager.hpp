@@ -3,10 +3,9 @@
 #include <vector>
 #include <memory>
 
-#include "DeckLinkDevice.hpp"
-
 namespace nos::decklink
 {
+class Device;
 class DeviceManager
 {
 public:

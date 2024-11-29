@@ -1,5 +1,8 @@
 #include "SubDevice.hpp"
 
+#include <Nodos/Modules.h>
+#include <EnumConversions.hpp>
+
 namespace nos::decklink
 {
 
@@ -164,7 +167,7 @@ bool SubDevice::OpenInput(BMDPixelFormat pixelFormat)
 		nosEngine.LogE("SubDevice: Input interface is not available for device: %s", ModelName.c_str());
 		return false;
 	}
-	return Input.Open(bmdModeHD1080p5994, pixelFormat); // Display mode will be auto-detected
+	return Input.Open(bmdModeNTSC, pixelFormat); // Display mode will be auto-detected
 }
 
 bool SubDevice::CloseInput()
