@@ -17,6 +17,8 @@ public:
 	~SubDevice();
 	bool IsBusyWith(nosMediaIODirection mode);
 	std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> GetSupportedOutputFrameGeometryAndFrameRates(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats);
+	int32_t AddInputVideoFormatChangeCallback(nosDeckLinkInputVideoFormatChangeCallback callback, void* userData);
+	void RemoveInputVideoFormatChangeCallback(uint32_t callbackId);
 
 	std::string ModelName;
 	int64_t SubDeviceIndex = -1;

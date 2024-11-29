@@ -2,6 +2,8 @@
 
 #include <Nodos/Modules.h>
 
+#include "EnumConversions.hpp"
+
 namespace nos::decklink
 {
 	
@@ -20,7 +22,6 @@ public:
 	HRESULT		STDMETHODCALLTYPE VideoInputFormatChanged (/* in */ BMDVideoInputFormatChangedEvents notificationEvents, /* in */ IDeckLinkDisplayMode *newDisplayMode, /* in */ BMDDetectedVideoInputFormatFlags detectedSignalFlags)
 	{
 		BMDPixelFormat      pixelFormat = bmdFormat10BitYUV;
-		// STRINGOBJ           displayModeString = NULL;
 		BMDVideoInputFlags  videoInputFlags = bmdVideoInputEnableFormatDetection;
 		
 		// // Check for video field changes
@@ -73,7 +74,7 @@ public:
 		
 		if (notificationEvents & (bmdVideoInputDisplayModeChanged | bmdVideoInputColorspaceChanged))
 		{
-			Input->OnInputVideoModeChanged_DeckLinkThread(newDisplayMode->GetDisplayMode(), pixelFormat);
+			Input->OnInputVideoFormatChanged_DeckLinkThread(newDisplayMode->GetDisplayMode(), pixelFormat);
 		}
 		
 		return S_OK;
@@ -203,9 +204,8 @@ void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* 
 	CanReadCond.notify_one();
 }
 
-void InputHandler::OnInputVideoModeChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat)
+void InputHandler::OnInputVideoFormatChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat)
 {
-	nosEngine.LogW("Input signal changed");
 	// Pause video capture
 	Interface->PauseStreams();
             
@@ -217,5 +217,29 @@ void InputHandler::OnInputVideoModeChanged_DeckLinkThread(BMDDisplayMode newDisp
 
 	// Start video capture
 	Interface->StartStreams();
+
+	auto [frameGeometry, frameRate] = GetFrameGeometryAndRatePairFromDeckLinkDisplayMode(newDisplayMode);
+	{
+		std::unique_lock lock(CallbacksMutex);
+		for (auto& [_, pair] : VideoFormatChangeCallbacks)
+		{
+			auto& [callback, userData] = pair;
+			callback(userData, frameGeometry, frameRate, GetPixelFormatFromDeckLink(pixelFormat));
+		}
+	}
+}
+
+int32_t InputHandler::AddInputVideoFormatChangeCallback(nosDeckLinkInputVideoFormatChangeCallback callback, void* userData)
+{
+	std::unique_lock lock(CallbacksMutex);
+	auto callbackId = NextCallbackId++;
+	VideoFormatChangeCallbacks[callbackId] = {callback, userData};
+	return callbackId;
+}
+
+void InputHandler::RemoveInputVideoFormatChangeCallback(int32_t callbackId)
+{
+	std::unique_lock lock(CallbacksMutex);
+	VideoFormatChangeCallbacks.erase(callbackId);
 }
 }

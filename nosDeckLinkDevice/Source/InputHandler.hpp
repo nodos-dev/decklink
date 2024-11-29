@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "nosDeckLinkDevice/nosDeckLinkDevice.h"
 
 namespace nos::decklink
 {
@@ -20,7 +21,14 @@ struct InputHandler : IOHandlerBase<IDeckLinkInput>
 	void DmaTransfer(void* buffer, size_t size) override;
 
 	void OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* frame);
-	void OnInputVideoModeChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat);
+	void OnInputVideoFormatChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat);
+
+	int32_t AddInputVideoFormatChangeCallback(nosDeckLinkInputVideoFormatChangeCallback callback, void* userData);
+	void RemoveInputVideoFormatChangeCallback(int32_t callbackId);
+	
+	std::mutex CallbacksMutex;
+	std::unordered_map<int32_t, std::pair<nosDeckLinkInputVideoFormatChangeCallback, void*>> VideoFormatChangeCallbacks;
+	int32_t NextCallbackId = 0;
 };
 
 }

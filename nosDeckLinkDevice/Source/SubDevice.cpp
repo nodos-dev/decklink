@@ -104,7 +104,7 @@ std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> SubDevice::GetS
 
 	for (auto& pixelFormat : pixelFormats)
 	{
-		for (int i = NOS_MEDIAIO_FG_MIN; i < NOS_MEDIAIO_FG_MAX; ++i)
+		for (int i = NOS_MEDIAIO_FRAME_GEOMETRY_MIN; i < NOS_MEDIAIO_FRAME_GEOMETRY_MAX; ++i)
 		{
 			auto fg = static_cast<nosMediaIOFrameGeometry>(i);
 			for (auto& displayMode : GetDisplayModesForFrameGeometry(fg))
@@ -117,6 +117,16 @@ std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> SubDevice::GetS
 		}
 	}
 	return supported;
+}
+
+int32_t SubDevice::AddInputVideoFormatChangeCallback(nosDeckLinkInputVideoFormatChangeCallback callback, void* userData)
+{
+	return Input.AddInputVideoFormatChangeCallback(callback, userData);
+}
+
+void SubDevice::RemoveInputVideoFormatChangeCallback(uint32_t callbackId)
+{
+	Input.RemoveInputVideoFormatChangeCallback(callbackId);
 }
 
 bool SubDevice::DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)

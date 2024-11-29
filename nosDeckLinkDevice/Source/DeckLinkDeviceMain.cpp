@@ -255,6 +255,41 @@ nosResult NOSAPI_CALL DMATransfer(uint32_t deviceIndex, nosDeckLinkChannel chann
 	return NOS_RESULT_SUCCESS;
 }
 
+int32_t NOSAPI_CALL RegisterInputVideoFormatChangeCallback(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkInputVideoFormatChangeCallback callback, void* userData)
+{
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	auto* subDevice = device->GetSubDeviceOfChannel(NOS_MEDIAIO_DIRECTION_INPUT, channel);
+	if (!subDevice)
+	{
+		nosEngine.LogE("No such sub-device for channel %s", GetChannelName(channel));
+		return -1;
+	}
+	return subDevice->AddInputVideoFormatChangeCallback(callback, userData);
+}
+
+nosResult NOSAPI_CALL UnregisterInputVideoFormatChangeCallback(uint32_t deviceIndex, nosDeckLinkChannel channel, int32_t callbackId)
+{
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	auto* subDevice = device->GetSubDeviceOfChannel(NOS_MEDIAIO_DIRECTION_INPUT, channel);
+	if (!subDevice)
+	{
+		nosEngine.LogE("No such sub-device for channel %s", GetChannelName(channel));
+		return NOS_RESULT_NOT_FOUND;
+	}
+	subDevice->RemoveInputVideoFormatChangeCallback(callbackId);
+	return NOS_RESULT_SUCCESS;	
+}
+
 nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 {
 	auto it = GExportedSubsystemVersions.find(minorVersion);
@@ -276,6 +311,8 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->GetCurrentDeltaSecondsOfChannel = GetCurrentDeltaSecondsOfChannel;
 	subsystem->WaitFrame = WaitFrame;
 	subsystem->DMATransfer = DMATransfer;
+	subsystem->RegisterInputVideoFormatChangeCallback = RegisterInputVideoFormatChangeCallback;
+	subsystem->UnregisterInputVideoFormatChangeCallback = UnregisterInputVideoFormatChangeCallback;
 	*outSubsystemContext = subsystem;
 	GExportedSubsystemVersions[minorVersion] = subsystem;
 	return NOS_RESULT_SUCCESS;

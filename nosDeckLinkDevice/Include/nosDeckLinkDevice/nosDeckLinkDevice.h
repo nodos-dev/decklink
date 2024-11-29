@@ -65,13 +65,15 @@ typedef struct nosDeckLinkOpenChannelParams
 		nosMediaIOFrameRate FrameRate;	
 	} Output; // Don't care if Direction == NOS_MEDIAIO_DIRECTION_INPUT
 } nosDeckLinkOpenOutputParams;
-	
+
+typedef void (NOSAPI_CALL* nosDeckLinkInputVideoFormatChangeCallback)(void* userData, nosMediaIOFrameGeometry geometry, nosMediaIOFrameRate frameRate, nosMediaIOPixelFormat pixelFormat);
+
 typedef struct nosDeckLinkSubsystem {
-	void (NOSAPI_CALL* GetDevices)(size_t *inoutCount, nosDeckLinkDeviceDesc* outDeviceDescriptors);
-	nosResult (NOSAPI_CALL* GetAvailableChannels)(uint32_t deviceIndex, nosMediaIODirection direction, nosDeckLinkChannelList* outChannels);
-	const char* (NOSAPI_CALL* GetChannelName)(nosDeckLinkChannel channel);
-	nosDeckLinkChannel (NOSAPI_CALL* GetChannelByName)(const char* channelName);
-	nosResult (NOSAPI_CALL* GetDeviceByUniqueDisplayName)(const char* uniqueDisplayName, uint32_t* outDeviceIndex);
+	void				(NOSAPI_CALL* GetDevices)(size_t *inoutCount, nosDeckLinkDeviceDesc* outDeviceDescriptors);
+	nosResult			(NOSAPI_CALL* GetAvailableChannels)(uint32_t deviceIndex, nosMediaIODirection direction, nosDeckLinkChannelList* outChannels);
+	const char*			(NOSAPI_CALL* GetChannelName)(nosDeckLinkChannel channel);
+	nosDeckLinkChannel	(NOSAPI_CALL* GetChannelByName)(const char* channelName);
+	nosResult			(NOSAPI_CALL* GetDeviceByUniqueDisplayName)(const char* uniqueDisplayName, uint32_t* outDeviceIndex);
 
 	// Channels
 	nosResult (NOSAPI_CALL* GetSupportedOutputFrameGeometries)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosMediaIOFrameGeometryList* outGeometries);
@@ -79,6 +81,8 @@ typedef struct nosDeckLinkSubsystem {
 	nosResult (NOSAPI_CALL* OpenChannel)(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params);
 	nosResult (NOSAPI_CALL* CloseChannel)(uint32_t deviceIndex, nosDeckLinkChannel channel);
 	nosResult (NOSAPI_CALL* GetCurrentDeltaSecondsOfChannel)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosVec2u* outDeltaSeconds);
+	int32_t   (NOSAPI_CALL* RegisterInputVideoFormatChangeCallback)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkInputVideoFormatChangeCallback callback, void* userData);
+	nosResult (NOSAPI_CALL* UnregisterInputVideoFormatChangeCallback)(uint32_t deviceIndex, nosDeckLinkChannel channel, int32_t callbackId);
 
 	// I/O
 	nosResult (NOSAPI_CALL* WaitFrame)(uint32_t deviceIndex, nosDeckLinkChannel channel, uint32_t timeoutMs);
