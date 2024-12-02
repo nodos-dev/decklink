@@ -138,7 +138,6 @@ bool OutputHandler::Close()
 		for (auto& frame : VideoFrames)
 			Release(frame);
 		WriteQueue.clear();
-		NextFrameToSchedule = 0;
 	}
 	return true;
 }
@@ -168,27 +167,27 @@ bool OutputHandler::WaitFrame(std::chrono::milliseconds timeout)
 void OutputHandler::DmaTransfer(void* buffer, size_t size)
 {
 	util::Stopwatch sw;
+	IDeckLinkVideoFrame* frame;
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		if (WriteQueue.empty())
 			return;
-		auto frame = WriteQueue.front();
-		VideoFrame output(frame);
-		output.StartAccess(bmdBufferAccessWrite);
-		size_t actualBufferSize = frame->GetRowBytes() * frame->GetHeight();
-		auto videoBufferBytes = output.GetBytes();
-		if (videoBufferBytes && buffer)
-		{
-			if (size != actualBufferSize)
-			{
-				nosEngine.LogW("(Device %d) %s DMA Write: Buffer size does not match frame size", DeviceIndex, GetChannelName(Channel));
-			}
-			size_t copySize = std::min(size, actualBufferSize);
-			std::memcpy(videoBufferBytes, buffer, copySize);
-		}
-		output.EndAccess();
-		WriteQueue.pop_front();
+		frame = WriteQueue.front();
 	}
+	VideoFrame output(frame);
+	output.StartAccess(bmdBufferAccessWrite);
+	size_t actualBufferSize = frame->GetRowBytes() * frame->GetHeight();
+	auto videoBufferBytes = output.GetBytes();
+	if (videoBufferBytes && buffer)
+	{
+		if (size != actualBufferSize)
+		{
+			nosEngine.LogW("(Device %d) %s DMA Write: Buffer size does not match frame size", DeviceIndex, GetChannelName(Channel));
+		}
+		size_t copySize = std::min(size, actualBufferSize);
+		std::memcpy(videoBufferBytes, buffer, copySize);
+	}
+	output.EndAccess();
 	auto seconds = sw.Elapsed();
 	char watchLogBuf[128];
 	snprintf(watchLogBuf, sizeof(watchLogBuf), "DeckLink %d:%s DMAWrite", DeviceIndex, GetChannelName(Channel));
@@ -198,9 +197,15 @@ void OutputHandler::DmaTransfer(void* buffer, size_t size)
 
 void OutputHandler::ScheduleNextFrame()
 {
-	IDeckLinkVideoFrame* frameToSchedule = VideoFrames[NextFrameToSchedule];
-	NextFrameToSchedule = ++NextFrameToSchedule % VideoFrames.size();
-	HRESULT result = Interface->ScheduleVideoFrame(frameToSchedule, TotalFramesScheduled * FrameDuration, FrameDuration, TimeScale);
+	IDeckLinkVideoFrame* frame;
+	{
+		std::unique_lock lock(VideoFramesMutex);
+		if (WriteQueue.empty())
+			return;
+		frame = WriteQueue.front();
+		WriteQueue.pop_front();
+	}
+	HRESULT result = Interface->ScheduleVideoFrame(frame, TotalFramesScheduled * FrameDuration, FrameDuration, TimeScale);
 	if (result != S_OK)
 		nosEngine.LogE("Failed to schedule video frame");
 	++TotalFramesScheduled;

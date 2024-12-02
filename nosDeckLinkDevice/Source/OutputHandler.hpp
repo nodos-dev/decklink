@@ -9,7 +9,6 @@ struct OutputHandler : IOHandlerBase<IDeckLinkOutput>
 	std::array<IDeckLinkMutableVideoFrame*, 2> VideoFrames{};
 	
 	uint32_t TotalFramesScheduled = 0;
-	uint32_t NextFrameToSchedule = 0;
 
 	std::mutex VideoFramesMutex;
 	std::condition_variable WriteCond;

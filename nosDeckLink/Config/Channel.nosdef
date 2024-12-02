@@ -75,9 +75,24 @@
                     "can_show_as": "PROPERTY_ONLY"
                 },
                 {
+                    "name": "PixelFormat",
+                    "display_name": "Pixel Format",
+                    "type_name": "string",
+                    "show_as": "PROPERTY",
+                    "can_show_as": "PROPERTY_ONLY"
+                },
+                {
                     "name": "ChannelResolution",
                     "display_name": "Channel Resolution",
                     "type_name": "nos.fb.vec2u",
+                    "show_as": "OUTPUT_PIN",
+                    "can_show_as": "OUTPUT_PIN_OR_PROPERTY",
+                    "readonly": true
+                },
+                {
+                    "name": "ChannelPixelFormat",
+                    "display_name": "Channel Pixel Format",
+                    "type_name": "nos.mediaio.YCbCrPixelFormat",
                     "show_as": "OUTPUT_PIN",
                     "can_show_as": "OUTPUT_PIN_OR_PROPERTY",
                     "readonly": true

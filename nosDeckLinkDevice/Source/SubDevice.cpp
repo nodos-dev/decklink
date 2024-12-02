@@ -119,6 +119,35 @@ std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> SubDevice::GetS
 	return supported;
 }
 
+std::map<nosMediaIOFrameGeometry, std::map<nosMediaIOFrameRate, std::set<nosMediaIOPixelFormat>>> SubDevice::GetSupportedOutputVideoFormats()
+{
+	std::map<nosMediaIOFrameGeometry, std::map<nosMediaIOFrameRate, std::set<nosMediaIOPixelFormat>>> supported;
+	if (!Output)
+	{
+		nosEngine.LogE("SubDevice: Output interface is not available for device: %s", ModelName.c_str());
+		return supported;
+	}
+
+	for (int i = NOS_MEDIAIO_PIXEL_FORMAT_MIN; i <= NOS_MEDIAIO_PIXEL_FORMAT_MAX; ++i)
+	{
+		auto pixelFormat = static_cast<nosMediaIOPixelFormat>(i);
+		if (pixelFormat == NOS_MEDIAIO_PIXEL_FORMAT_INVALID)
+			continue;
+		for (int i = NOS_MEDIAIO_FRAME_GEOMETRY_MIN; i < NOS_MEDIAIO_FRAME_GEOMETRY_MAX; ++i)
+		{
+			auto fg = static_cast<nosMediaIOFrameGeometry>(i);
+			for (auto& displayMode : GetDisplayModesForFrameGeometry(fg))
+			{
+				if (DoesSupportOutputVideoMode(displayMode, GetDeckLinkPixelFormat(pixelFormat)))
+				{
+					supported[fg][GetFrameRateFromDisplayMode(displayMode)].insert(pixelFormat);
+				}
+			}
+		}
+	}
+	return supported;
+}
+
 int32_t SubDevice::AddInputVideoFormatChangeCallback(nosDeckLinkInputVideoFormatChangeCallback callback, void* userData)
 {
 	return Input.AddInputVideoFormatChangeCallback(callback, userData);

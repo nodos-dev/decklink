@@ -159,7 +159,25 @@ nosResult NOSAPI_CALL GetSupportedOutputFrameRatesForGeometry(uint32_t deviceInd
 	for (auto it = frameRates.rbegin(); it != frameRates.rend(); ++it)
 		outFrameRates->FrameRates[i++] = *it;
 	return NOS_RESULT_SUCCESS;
-	
+}
+
+nosResult NOSAPI_CALL GetSupportedOutputPixelFormats(uint32_t deviceIndex, nosDeckLinkChannel channel, nosMediaIOFrameGeometry frameGeo, nosMediaIOFrameRate frameRate, nosMediaIOPixelFormatList* outList)
+{
+	if (!outList)
+	{
+		nosEngine.LogE("Invalid argument: outList is nullptr");
+		return NOS_RESULT_INVALID_ARGUMENT;
+	}
+	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
+	if (!subDevice)
+		return NOS_RESULT_NOT_FOUND;
+	auto supported = subDevice->GetSupportedOutputVideoFormats();
+	auto& pixelFormats = supported[frameGeo][frameRate];
+	outList->Count = pixelFormats.size();
+	int i = 0;
+	for (auto& fmt : pixelFormats)
+		outList->PixelFormats[i++] = fmt;
+	return NOS_RESULT_SUCCESS;
 }
 
 nosResult NOSAPI_CALL OpenChannel(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params)
@@ -328,6 +346,7 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->GetDeviceByUniqueDisplayName = GetDeviceByUniqueDisplayName;
 	subsystem->GetSupportedOutputFrameGeometries = GetSupportedOutputFrameGeometries;
 	subsystem->GetSupportedOutputFrameRatesForGeometry = GetSupportedOutputFrameRatesForGeometry;
+	subsystem->GetSupportedOutputPixelFormats = GetSupportedOutputPixelFormats;
 	subsystem->OpenChannel = OpenChannel;
 	subsystem->CloseChannel = CloseChannel;
 	subsystem->GetCurrentDeltaSecondsOfChannel = GetCurrentDeltaSecondsOfChannel;
