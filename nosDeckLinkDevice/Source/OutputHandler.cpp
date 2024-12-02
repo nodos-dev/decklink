@@ -144,8 +144,7 @@ bool OutputHandler::Close()
 bool OutputHandler::WaitFrame(std::chrono::milliseconds timeout)
 {
 	std::unique_lock lock(VideoFramesMutex);
-	auto res = WriteCond.wait_for(lock, timeout, [this]()
-	{
+	auto res = WriteCond.wait_for(lock, timeout, [this] {
 		return !WriteQueue.empty();
 	});
 	return res;

@@ -215,6 +215,7 @@ void InputHandler::DmaTransfer(void* buffer, size_t size)
 	}
 	auto copySize = std::min(actualSize, size);
 	std::memcpy(buffer, readFrame->GetBytes(), copySize);
+	readFrame->EndAccess();
 }
 
 void InputHandler::OnInputVideoFormatChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat)
