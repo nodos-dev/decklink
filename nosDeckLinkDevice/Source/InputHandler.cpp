@@ -99,12 +99,16 @@ InputHandler::~InputHandler()
 
 void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* frame)
 {
+	BMDTimeValue frameTime, frameDuration;
+	auto res = frame->GetStreamTime(&frameTime, &frameDuration, TimeScale);
+	if (res != S_OK)
+		return;
 	auto inputFrame = std::make_unique<VideoFrame>(frame);
 	inputFrame->StartAccess(bmdBufferAccessRead);
 	{
 		std::unique_lock lock(ReadFramesMutex);
 		ReadFrames.push_back(std::move(inputFrame));
-		nosEngine.WatchLog("Input Frame Count", std::to_string(ReadFrames.size()).c_str());
+		nosEngine.WatchLog("DeckLink Input Queue Size", std::to_string(ReadFrames.size()).c_str());
 	}
 	FrameAvailableCond.notify_one();
 }

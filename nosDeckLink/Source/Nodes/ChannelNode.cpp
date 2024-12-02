@@ -262,8 +262,6 @@ public:
 			break;
 		}
 		case ChangedPinType::ChannelName: {
-			// if (IsInput)
-			// 	TryUpdateChannel();
 			auto resolutionList = GetPossibleResolutions();
 			UpdateStringList(GetResolutionStringListName(), resolutionList);
 			if(!isInput && !first)
@@ -397,12 +395,14 @@ public:
 
 	void OnPathStart() override
 	{
-		nosDeckLink->StartStream(Channel.DeviceIndex, Channel.Channel);
+		if (Channel.IsOpen)
+			nosDeckLink->StartStream(Channel.DeviceIndex, Channel.Channel);
 	}
 
 	void OnPathStop() override
 	{
-		nosDeckLink->StopStream(Channel.DeviceIndex, Channel.Channel);
+		if (Channel.IsOpen)
+			nosDeckLink->StopStream(Channel.DeviceIndex, Channel.Channel);
 	}
 };
 

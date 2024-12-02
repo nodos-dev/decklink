@@ -144,20 +144,11 @@ bool OutputHandler::Close()
 bool OutputHandler::WaitFrame(std::chrono::milliseconds timeout)
 {
 	std::unique_lock lock(VideoFramesMutex);
-	return WriteCond.wait_for(lock, timeout, [this]()
+	auto res = WriteCond.wait_for(lock, timeout, [this]()
 	{
 		return !WriteQueue.empty();
 	});
-}
-
-void OutputHandler::ScheduleNextFrame()
-{
-	IDeckLinkVideoFrame* frameToSchedule = VideoFrames[NextFrameToSchedule];
-	NextFrameToSchedule = ++NextFrameToSchedule % VideoFrames.size();
-	HRESULT result = Interface->ScheduleVideoFrame(frameToSchedule, TotalFramesScheduled * FrameDuration, FrameDuration, TimeScale);
-	if (result != S_OK)
-		nosEngine.LogE("Failed to schedule video frame");
-	++TotalFramesScheduled;
+	return res;
 }
 
 void OutputHandler::DmaTransfer(void* buffer, size_t size)
@@ -186,11 +177,22 @@ void OutputHandler::DmaTransfer(void* buffer, size_t size)
 	ScheduleNextFrame();
 }
 
+void OutputHandler::ScheduleNextFrame()
+{
+	IDeckLinkVideoFrame* frameToSchedule = VideoFrames[NextFrameToSchedule];
+	NextFrameToSchedule = ++NextFrameToSchedule % VideoFrames.size();
+	HRESULT result = Interface->ScheduleVideoFrame(frameToSchedule, TotalFramesScheduled * FrameDuration, FrameDuration, TimeScale);
+	if (result != S_OK)
+		nosEngine.LogE("Failed to schedule video frame");
+	++TotalFramesScheduled;
+}
+
 void OutputHandler::ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result)
 {
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		WriteQueue.push_back(completedFrame);
+		nosEngine.WatchLog("DeckLink Output Queue Size", std::to_string(WriteQueue.size()).c_str());
 	}
 	WriteCond.notify_one();
 	if (result != bmdOutputFrameCompleted)

@@ -16,17 +16,22 @@ struct WaitFrameNode : NodeContext
 	{
 	}
 
+	void OnPinValueChanged(nos::Name pinName, nosUUID pinId, nosBuffer value) override
+	{ 
+		if (pinName == NOS_NAME_STATIC("ChannelId"))
+		{
+			auto& newChannelId = *InterpretPinValue<ChannelId>(value);
+			if (CurChannelId == newChannelId)
+				return;
+			CurChannelId = newChannelId;
+		}
+	}
+
 	nosResult ExecuteNode(nosNodeExecuteParams* params) override
 	{
-		ChannelId* channelId = nullptr;
-		for (size_t i = 0; i < params->PinCount; ++i)
-		{
-			auto& pin = params->Pins[i];
-			if (pin.Name == NOS_NAME("ChannelId"))
-				channelId = InterpretPinValue<ChannelId>(*pin.Data);
-		}
-		auto deviceIndex = channelId->device_index();
-		auto channel = static_cast<nosDeckLinkChannel>(channelId->channel_index());
+		auto deviceIndex = CurChannelId.device_index();
+		auto channel = static_cast<nosDeckLinkChannel>(CurChannelId.channel_index());
+
 		{
 			util::Stopwatch sw;
 			nosDeckLink->WaitFrame(deviceIndex, channel, 100);
@@ -37,6 +42,9 @@ struct WaitFrameNode : NodeContext
 		}
 		return NOS_RESULT_SUCCESS;
 	}
+
+	ChannelId CurChannelId;
+	
 };
 
 nosResult RegisterWaitFrameNode(nosNodeFunctions* functions)

@@ -22,7 +22,7 @@ struct DMAWriteNode : NodeContext
 	{
 		*out = nosScheduleInfo{
 			.Importance = 1,
-			.DeltaSeconds = LastDeltaSeconds,
+			.DeltaSeconds = DeltaSeconds,
 			.Type = NOS_SCHEDULE_TYPE_ON_DEMAND,
 		};
 	}
@@ -32,16 +32,16 @@ struct DMAWriteNode : NodeContext
 		if (pinName == NOS_NAME_STATIC("ChannelId"))
 		{
 			auto& newChannelId = *InterpretPinValue<ChannelId>(value);
-			if (LastChannelId == newChannelId)
+			if (CurChannelId == newChannelId)
 				return;
-			LastChannelId = newChannelId;
+			CurChannelId = newChannelId;
 			nosVec2u deltaSeconds{0, 0};
-			if (LastChannelId.device_index() != -1)
+			if (CurChannelId.device_index() != -1)
 			{
-				nosDeckLink->GetCurrentDeltaSecondsOfChannel(LastChannelId.device_index(), static_cast<nosDeckLinkChannel>(LastChannelId.channel_index()), &deltaSeconds);
-				if (memcmp(&deltaSeconds, &LastDeltaSeconds, sizeof(deltaSeconds)) != 0)
+				nosDeckLink->GetCurrentDeltaSecondsOfChannel(CurChannelId.device_index(), static_cast<nosDeckLinkChannel>(CurChannelId.channel_index()), &deltaSeconds);
+				if (memcmp(&deltaSeconds, &DeltaSeconds, sizeof(deltaSeconds)) != 0)
 				{
-					LastDeltaSeconds = deltaSeconds;
+					DeltaSeconds = deltaSeconds;
 					nosEngine.RecompilePath(NodeId);
 				}
 			}
@@ -52,7 +52,6 @@ struct DMAWriteNode : NodeContext
 	{
 		nosResourceShareInfo inputBuffer{};
 		auto fieldType = nos::sys::vulkan::FieldType::UNKNOWN;
-		ChannelId* channelId = nullptr;
 		for (size_t i = 0; i < params->PinCount; ++i)
 		{
 			auto& pin = params->Pins[i];
@@ -60,12 +59,10 @@ struct DMAWriteNode : NodeContext
 				inputBuffer = vkss::ConvertToResourceInfo(*InterpretPinValue<sys::vulkan::Buffer>(*pin.Data));
 			if (pin.Name == NOS_NAME("FieldType"))
 				fieldType = *InterpretPinValue<sys::vulkan::FieldType>(*pin.Data);
-			if (pin.Name == NOS_NAME("ChannelId"))
-				channelId = InterpretPinValue<ChannelId>(*pin.Data);
 		}
 
-		auto deviceIndex = channelId->device_index();
-		auto channel = static_cast<nosDeckLinkChannel>(channelId->channel_index());
+		auto deviceIndex = CurChannelId.device_index();
+		auto channel = static_cast<nosDeckLinkChannel>(CurChannelId.channel_index());
 
 		if (!inputBuffer.Memory.Handle)
 			return NOS_RESULT_FAILED;
@@ -93,16 +90,10 @@ struct DMAWriteNode : NodeContext
 	{
 		nosScheduleNodeParams schedule{.NodeId = NodeId, .AddScheduleCount = 1};
 		nosEngine.ScheduleNode(&schedule);
-		nosDeckLink->StartStream(LastChannelId.device_index(), static_cast<nosDeckLinkChannel>(LastChannelId.channel_index()));
 	}
 
-	void OnPathStop() override
-	{
-		nosDeckLink->StopStream(LastChannelId.device_index(), static_cast<nosDeckLinkChannel>(LastChannelId.channel_index()));
-	}
-
-	ChannelId LastChannelId;
-	nosVec2u LastDeltaSeconds{0, 0};
+	ChannelId CurChannelId;
+	nosVec2u DeltaSeconds{0, 0};
 };
 
 nosResult RegisterDMAWriteNode(nosNodeFunctions* functions)
