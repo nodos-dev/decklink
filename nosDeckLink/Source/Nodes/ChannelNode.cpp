@@ -39,6 +39,7 @@ struct ChannelHandler
 {
 	bool ShouldOpen = true;
 	bool IsOpen = false;
+	bool IsStreamStarted = false;
 	nosUUID OutChannelPinId;
 	nosUUID OutResolutionPinId;
 	nosUUID ResolutionPinId;
@@ -77,18 +78,6 @@ struct ChannelHandler
 		nosEngine.SetPinValue(FrameRatePinId, nos::Buffer(frameRateCstr, strlen(frameRateCstr) + 1));
 	}
 	
-	void Close()
-	{
-		if (Direction == NOS_MEDIAIO_DIRECTION_INPUT)
-			nosDeckLink->UnregisterInputVideoFormatChangeCallback(DeviceIndex, Channel, VideoInputChangeCallbackId);
-			
-		nosDeckLink->CloseChannel(DeviceIndex, Channel);
-		IsOpen = false;
-		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId(-1, 0, false)));
-		nosEngine.SetPinValue(OutResolutionPinId, nos::Buffer::From(nosVec2u{0, 0}));
-		nosEngine.SendPathRestart(OutChannelPinId);
-	}
-	
 	bool Open()
 	{
 		if (!ShouldOpen)
@@ -123,6 +112,30 @@ struct ChannelHandler
 		UpdateResolution();
 		nosEngine.SendPathRestart(OutChannelPinId);
 		return true;
+	}
+
+	void StartIfOpen()
+	{
+		if (IsOpen)
+			nosDeckLink->StartStream(DeviceIndex, Channel);
+	}
+
+	void StopIfOpen()
+	{
+		if (IsOpen)
+			nosDeckLink->StopStream(DeviceIndex, Channel);
+	}
+
+	void Close()
+	{
+		if (Direction == NOS_MEDIAIO_DIRECTION_INPUT)
+			nosDeckLink->UnregisterInputVideoFormatChangeCallback(DeviceIndex, Channel, VideoInputChangeCallbackId);
+
+		nosDeckLink->CloseChannel(DeviceIndex, Channel);
+		IsOpen = false;
+		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId(-1, 0, false)));
+		nosEngine.SetPinValue(OutResolutionPinId, nos::Buffer::From(nosVec2u{ 0, 0 }));
+		nosEngine.SendPathRestart(OutChannelPinId);
 	}
 
 	void UpdateResolution()
@@ -318,7 +331,8 @@ public:
 
 	nosResult ExecuteNode(nosNodeExecuteParams* params) override
 	{
-		return NOS_RESULT_SUCCESS;
+		Channel.StartIfOpen();
+		return Channel.IsOpen ? NOS_RESULT_SUCCESS : NOS_RESULT_FAILED;
 	}
 	
 	std::string GetDeviceStringListName() { return "decklink.DeviceList." + UUID2STR(NodeId); }
@@ -393,16 +407,9 @@ public:
 
 	ChannelHandler Channel;
 
-	void OnPathStart() override
-	{
-		if (Channel.IsOpen)
-			nosDeckLink->StartStream(Channel.DeviceIndex, Channel.Channel);
-	}
-
 	void OnPathStop() override
 	{
-		if (Channel.IsOpen)
-			nosDeckLink->StopStream(Channel.DeviceIndex, Channel.Channel);
+		Channel.StopIfOpen();
 	}
 };
 

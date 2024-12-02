@@ -38,7 +38,6 @@ public:
 
 	// Input
 	bool OpenInput(BMDPixelFormat pixelFormat);
-	bool FlushInput();
 	bool CloseInput();
 
 	// Input/Output

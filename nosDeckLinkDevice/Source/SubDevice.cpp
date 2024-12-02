@@ -129,16 +129,6 @@ void SubDevice::RemoveInputVideoFormatChangeCallback(uint32_t callbackId)
 	Input.RemoveInputVideoFormatChangeCallback(callbackId);
 }
 
-bool SubDevice::FlushInput()
-{
-	if (!Input)
-	{
-		nosEngine.LogE("SubDevice: Input interface is not available for device: %s", ModelName.c_str());
-		return false;
-	}
-	return Input.Flush();
-}
-
 bool SubDevice::StartStream(nosMediaIODirection mode)
 {
 	return GetIO(mode).StartStream();

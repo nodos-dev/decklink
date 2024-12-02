@@ -312,16 +312,6 @@ nosResult NOSAPI_CALL StopStream(uint32_t deviceIndex, nosDeckLinkChannel channe
 	return device->StopStream(channel) ? NOS_RESULT_SUCCESS : NOS_RESULT_FAILED;
 }
 
-nosResult NOSAPI_CALL FlushInput(uint32_t deviceIndex, nosDeckLinkChannel channel)
-{
-	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_INPUT, channel);
-	if (!subDevice)
-		return NOS_RESULT_NOT_FOUND;
-	if (!subDevice->FlushInput())
-		return NOS_RESULT_FAILED;
-	return NOS_RESULT_SUCCESS;
-}
-
 nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 {
 	auto it = GExportedSubsystemVersions.find(minorVersion);
@@ -347,7 +337,6 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->UnregisterInputVideoFormatChangeCallback = UnregisterInputVideoFormatChangeCallback;
 	subsystem->StartStream = StartStream;
 	subsystem->StopStream = StopStream;
-	subsystem->FlushInput = FlushInput;
 	*outSubsystemContext = subsystem;
 	GExportedSubsystemVersions[minorVersion] = subsystem;
 	return NOS_RESULT_SUCCESS;
