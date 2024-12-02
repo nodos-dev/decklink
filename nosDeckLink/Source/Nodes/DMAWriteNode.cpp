@@ -68,14 +68,7 @@ struct DMAWriteNode : NodeContext
 			return NOS_RESULT_FAILED;
 
 		auto buffer = nosVulkan->Map(&inputBuffer);
-		{
-			util::Stopwatch sw;
-			nosDeckLink->DMATransfer(deviceIndex, channel, buffer, inputBuffer.Info.Buffer.Size);
-			auto elapsed = sw.ElapsedString();
-			char log[256];
-			snprintf(log, sizeof(log), "DeckLink %d:%d DMAWrite", deviceIndex, channel);
-			nosEngine.WatchLog(log, elapsed.c_str());
-		}
+		nosDeckLink->DMATransfer(deviceIndex, channel, buffer, inputBuffer.Info.Buffer.Size);
 
 		nosScheduleNodeParams schedule {
 			.NodeId = NodeId,

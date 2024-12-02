@@ -16,6 +16,8 @@
 #include <chrono>
 #include <string>
 
+#include "nosDeckLinkDevice/nosDeckLinkDevice.h"
+
 namespace nos::decklink
 {
 template <typename T>
@@ -91,6 +93,10 @@ private:
 struct IOHandlerBaseI
 {
 	virtual ~IOHandlerBaseI() = default;
+
+	// Info
+	nosDeckLinkChannel Channel = NOS_DECKLINK_CHANNEL_INVALID;
+	uint32_t DeviceIndex = -1;
 
 	BMDTimeValue FrameDuration = 0;
 	BMDTimeScale TimeScale = 0;

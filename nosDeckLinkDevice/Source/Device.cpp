@@ -107,6 +107,9 @@ Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevi
 		ModelName = SubDevices[0]->ModelName;
 		GroupId = SubDevices[0]->DeviceGroupId;
 	}
+
+	for (auto& subDevice : SubDevices)
+		subDevice->TagDevice(Index);
 	
 	// Determine which sub-devices are capable of opening the channel
 	auto& channelMap = GetChannelMap();
@@ -130,6 +133,7 @@ Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevi
 					for (auto mode : modes)
 					{
 						Channel2SubDevice[mode][curChannel] = subDevice;
+						subDevice->TagChannel(mode, curChannel);
 					}
 				}
 			}

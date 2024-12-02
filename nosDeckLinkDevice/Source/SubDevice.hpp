@@ -44,6 +44,9 @@ public:
 	bool StartStream(nosMediaIODirection mode);
 	bool StopStream(nosMediaIODirection mode);
 
+	void TagChannel(nosMediaIODirection dir, nosDeckLinkChannel channel);
+	void TagDevice(uint32_t deviceIndex);
+
 	constexpr IOHandlerBaseI& GetIO(nosMediaIODirection dir);
 
 	IDeckLinkProfileManager* ProfileManager = nullptr;

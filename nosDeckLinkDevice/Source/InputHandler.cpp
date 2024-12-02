@@ -1,6 +1,7 @@
 #include "InputHandler.hpp"
 
 #include <Nodos/Modules.h>
+#include <nosUtil/Stopwatch.hpp>
 
 #include "EnumConversions.hpp"
 #include "VideoFrame.hpp"
@@ -108,7 +109,9 @@ void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* 
 	{
 		std::unique_lock lock(ReadFramesMutex);
 		ReadFrames.push_back(std::move(inputFrame));
-		nosEngine.WatchLog("DeckLink Input Queue Size", std::to_string(ReadFrames.size()).c_str());
+		char buffer[256];
+		snprintf(buffer, sizeof(buffer), "DeckLink %d:%s Input Queue Size", DeviceIndex, GetChannelName(Channel));
+		nosEngine.WatchLog(buffer, std::to_string(ReadFrames.size()).c_str());
 	}
 	FrameAvailableCond.notify_one();
 }
@@ -190,32 +193,53 @@ bool InputHandler::Close()
 
 bool InputHandler::WaitFrame(std::chrono::milliseconds timeout)
 {
-	std::unique_lock lock(ReadFramesMutex);
-	return FrameAvailableCond.wait_for(lock, timeout, [this]{
-		return !ReadFrames.empty();
-	});
+	util::Stopwatch sw;
+	bool res;
+	{
+		std::unique_lock lock(ReadFramesMutex);
+		res = FrameAvailableCond.wait_for(lock, timeout, [this]{
+			return !ReadFrames.empty();
+		});
+		if (!res)
+		{
+			nosEngine.LogE("%d:%s Input: Timeout waiting for frame", DeviceIndex, GetChannelName(Channel));
+			return false;
+		}
+	}
+	auto seconds = sw.Elapsed();
+	char watchLogBuf[128];
+	snprintf(watchLogBuf, sizeof(watchLogBuf), "DeckLink %d:%s WaitFrame", DeviceIndex, GetChannelName(Channel));
+	nosEngine.WatchLog(watchLogBuf, util::Stopwatch::ElapsedString(seconds).c_str());
+	return res;
 }
 
 void InputHandler::DmaTransfer(void* buffer, size_t size)
 {
-	std::unique_lock lock(ReadFramesMutex);
-	if (ReadFrames.empty())
+	util::Stopwatch sw;
 	{
-		nosEngine.LogE("DMA Read: No frame available to read");
-		return;
+		std::unique_lock lock(ReadFramesMutex);
+		if (ReadFrames.empty())
+		{
+			nosEngine.LogE("DMA Read: No frame available to read");
+			return;
+		}
+		auto readFrame = std::move(ReadFrames.front());
+		ReadFrames.pop_front();
+		size_t actualSize = readFrame->Size;
+		if (!actualSize)
+			return;
+		if (size != actualSize)
+		{
+			nosEngine.LogW("(Device %d) %s DMA Read: Buffer size does not match frame size", DeviceIndex, GetChannelName(Channel));
+		}
+		auto copySize = std::min(actualSize, size);
+		std::memcpy(buffer, readFrame->GetBytes(), copySize);
+		readFrame->EndAccess();
 	}
-	auto readFrame = std::move(ReadFrames.front());
-	ReadFrames.pop_front();
-	size_t actualSize = readFrame->Size;
-	if (!actualSize)
-		return;
-	if (actualSize != size)
-	{
-		nosEngine.LogE("DMA Read: Buffer size does not match frame size");
-	}
-	auto copySize = std::min(actualSize, size);
-	std::memcpy(buffer, readFrame->GetBytes(), copySize);
-	readFrame->EndAccess();
+	auto seconds = sw.Elapsed();
+	char watchLogBuf[128];
+	snprintf(watchLogBuf, sizeof(watchLogBuf), "DeckLink %d:%s DMARead", DeviceIndex, GetChannelName(Channel));
+	nosEngine.WatchLog(watchLogBuf, util::Stopwatch::ElapsedString(seconds).c_str());
 }
 
 void InputHandler::OnInputVideoFormatChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat pixelFormat)

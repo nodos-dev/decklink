@@ -139,6 +139,17 @@ bool SubDevice::StopStream(nosMediaIODirection mode)
 	return GetIO(mode).StopStream();
 }
 
+void SubDevice::TagChannel(nosMediaIODirection dir, nosDeckLinkChannel channel)
+{
+	GetIO(dir).Channel = channel;
+}
+
+void SubDevice::TagDevice(uint32_t deviceIndex)
+{
+	GetIO(NOS_MEDIAIO_DIRECTION_INPUT).DeviceIndex = deviceIndex;
+	GetIO(NOS_MEDIAIO_DIRECTION_OUTPUT).DeviceIndex = deviceIndex;
+}
+
 bool SubDevice::DoesSupportOutputVideoMode(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 {
 	if (!Output)

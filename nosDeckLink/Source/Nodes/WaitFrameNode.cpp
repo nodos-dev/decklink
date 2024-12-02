@@ -31,15 +31,7 @@ struct WaitFrameNode : NodeContext
 	{
 		auto deviceIndex = CurChannelId.device_index();
 		auto channel = static_cast<nosDeckLinkChannel>(CurChannelId.channel_index());
-
-		{
-			util::Stopwatch sw;
-			nosDeckLink->WaitFrame(deviceIndex, channel, 100);
-			auto elapsed = sw.ElapsedString();
-			char log[256];
-			snprintf(log, sizeof(log), "DeckLink %d:%d WaitFrame", deviceIndex, channel);
-			nosEngine.WatchLog(log, elapsed.c_str());
-		}
+		nosDeckLink->WaitFrame(deviceIndex, channel, 100);
 		return NOS_RESULT_SUCCESS;
 	}
 

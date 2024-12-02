@@ -1,7 +1,9 @@
 #include "OutputHandler.hpp"
 
 #include <Nodos/Modules.h>
+#include <nosUtil/Stopwatch.hpp>
 
+#include "EnumConversions.hpp"
 #include "VideoFrame.hpp"
 
 namespace nos::decklink
@@ -143,15 +145,29 @@ bool OutputHandler::Close()
 
 bool OutputHandler::WaitFrame(std::chrono::milliseconds timeout)
 {
-	std::unique_lock lock(VideoFramesMutex);
-	auto res = WriteCond.wait_for(lock, timeout, [this] {
-		return !WriteQueue.empty();
-	});
+	util::Stopwatch sw;
+	bool res;
+	{
+		std::unique_lock lock(VideoFramesMutex);
+		res = WriteCond.wait_for(lock, timeout, [this] {
+			return !WriteQueue.empty();
+		});
+		if (!res)
+		{
+			nosEngine.LogE("%d:%s Output: Timeout waiting for frame", DeviceIndex, GetChannelName(Channel));
+			return false;
+		}
+	}
+	auto seconds = sw.Elapsed();
+	char watchLogBuf[128];
+	snprintf(watchLogBuf, sizeof(watchLogBuf), "DeckLink %d:%s WaitFrame", DeviceIndex, GetChannelName(Channel));
+	nosEngine.WatchLog(watchLogBuf, util::Stopwatch::ElapsedString(seconds).c_str());
 	return res;
 }
 
 void OutputHandler::DmaTransfer(void* buffer, size_t size)
 {
+	util::Stopwatch sw;
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		if (WriteQueue.empty())
@@ -165,7 +181,7 @@ void OutputHandler::DmaTransfer(void* buffer, size_t size)
 		{
 			if (size != actualBufferSize)
 			{
-				nosEngine.LogE("DMA Write: Buffer size does not match frame size");
+				nosEngine.LogW("(Device %d) %s DMA Write: Buffer size does not match frame size", DeviceIndex, GetChannelName(Channel));
 			}
 			size_t copySize = std::min(size, actualBufferSize);
 			std::memcpy(videoBufferBytes, buffer, copySize);
@@ -173,6 +189,10 @@ void OutputHandler::DmaTransfer(void* buffer, size_t size)
 		output.EndAccess();
 		WriteQueue.pop_front();
 	}
+	auto seconds = sw.Elapsed();
+	char watchLogBuf[128];
+	snprintf(watchLogBuf, sizeof(watchLogBuf), "DeckLink %d:%s DMAWrite", DeviceIndex, GetChannelName(Channel));
+	nosEngine.WatchLog(watchLogBuf, util::Stopwatch::ElapsedString(seconds).c_str());
 	ScheduleNextFrame();
 }
 
@@ -191,7 +211,9 @@ void OutputHandler::ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* 
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		WriteQueue.push_back(completedFrame);
-		nosEngine.WatchLog("DeckLink Output Queue Size", std::to_string(WriteQueue.size()).c_str());
+		char buffer[128];
+		snprintf(buffer, sizeof(buffer), "DeckLink %d:%s Output Queue Size", DeviceIndex, GetChannelName(Channel));
+		nosEngine.WatchLog(buffer, std::to_string(WriteQueue.size()).c_str());
 	}
 	WriteCond.notify_one();
 	if (result != bmdOutputFrameCompleted)
@@ -202,7 +224,7 @@ void OutputHandler::ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* 
 		case bmdOutputFrameDisplayedLate: resultStr = "'DisplayedLate'"; break;
 		case bmdOutputFrameFlushed: resultStr = "'Flushed'"; break;
 		}
-		nosEngine.LogW("DeckLink: A frame completed with %s", resultStr);
+		nosEngine.LogW("(Device %d) %s Output %s", DeviceIndex, GetChannelName(Channel), resultStr);
 	}
 }
 }
