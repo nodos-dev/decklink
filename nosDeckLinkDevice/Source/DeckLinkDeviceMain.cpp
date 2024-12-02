@@ -250,10 +250,7 @@ nosResult NOSAPI_CALL WaitFrame(uint32_t deviceIndex, nosDeckLinkChannel channel
 		return NOS_RESULT_NOT_FOUND;
 	}
 	if (!device->WaitFrame(channel, std::chrono::milliseconds(timeoutMs)))
-	{
-		nosEngine.LogE("Failed to wait frame for channel %s", GetChannelName(channel));
 		return NOS_RESULT_FAILED;
-	}
 	return NOS_RESULT_SUCCESS;
 }
 
@@ -266,10 +263,7 @@ nosResult NOSAPI_CALL DMATransfer(uint32_t deviceIndex, nosDeckLinkChannel chann
 		return NOS_RESULT_NOT_FOUND;
 	}
 	if (!device->DmaTransfer(channel, data, size))
-	{
-		nosEngine.LogE("Failed to wait frame for channel %s", GetChannelName(channel));
 		return NOS_RESULT_FAILED;
-	}
 	return NOS_RESULT_SUCCESS;
 }
 

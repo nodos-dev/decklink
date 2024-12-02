@@ -202,7 +202,7 @@ bool InputHandler::WaitFrame(std::chrono::milliseconds timeout)
 		});
 		if (!res)
 		{
-			nosEngine.LogE("%d:%s Input: Timeout waiting for frame", DeviceIndex, GetChannelName(Channel));
+			nosEngine.LogE("(Device %d) %s Input: Timeout waiting for frame", DeviceIndex, GetChannelName(Channel));
 			return false;
 		}
 	}
@@ -220,7 +220,7 @@ void InputHandler::DmaTransfer(void* buffer, size_t size)
 		std::unique_lock lock(ReadFramesMutex);
 		if (ReadFrames.empty())
 		{
-			nosEngine.LogE("DMA Read: No frame available to read");
+			nosEngine.LogE("(Device %d) %s DMA Read: No frame available to read", DeviceIndex, GetChannelName(Channel));
 			return;
 		}
 		auto readFrame = std::move(ReadFrames.front());

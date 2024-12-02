@@ -50,6 +50,8 @@ OutputHandler::~OutputHandler()
 
 bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 {
+	if (pixelFormat == bmdFormatUnspecified)
+		return false;
 	HRESULT res;
 	{
 		std::unique_lock lock(VideoFramesMutex);
@@ -59,6 +61,7 @@ bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 		{
 			// Get width and height from display mode
 			long width, height;
+			int rowBytes;
 			{
 				IDeckLinkDisplayMode* displayModeInterface = nullptr;
 				res = Interface->GetDisplayMode(displayMode, &displayModeInterface);
@@ -69,9 +72,13 @@ bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 				res = displayModeInterface->GetFrameRate(&FrameDuration, &TimeScale);
 				if (res != S_OK)
 					return false;
+				rowBytes = 0;
+				res = Interface->RowBytesForPixelFormat(pixelFormat, width, &rowBytes);
+				if (res != S_OK)
+					return false;
 				Release(displayModeInterface);
 			}
-			Interface->CreateVideoFrame(width, height, width * 2, pixelFormat, bmdFrameFlagDefault, &frame);
+			Interface->CreateVideoFrame(width, height, rowBytes, pixelFormat, bmdFrameFlagDefault, &frame);
 			if (!frame)
 				return false;
 			WriteQueue.push_back(frame);
@@ -105,6 +112,9 @@ bool OutputHandler::Start()
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		TotalFramesScheduled = 0;
+		WriteQueue.clear();
+		for (auto& frame : VideoFrames)
+			WriteQueue.push_back(frame);
 	}
 	auto res = Interface->StartScheduledPlayback(0, TimeScale, 1.0);
 	if (res != S_OK)
@@ -153,7 +163,7 @@ bool OutputHandler::WaitFrame(std::chrono::milliseconds timeout)
 		});
 		if (!res)
 		{
-			nosEngine.LogE("%d:%s Output: Timeout waiting for frame", DeviceIndex, GetChannelName(Channel));
+			nosEngine.LogE("(Device %d) %s Output: Timeout waiting for frame", DeviceIndex, GetChannelName(Channel));
 			return false;
 		}
 	}
@@ -171,23 +181,28 @@ void OutputHandler::DmaTransfer(void* buffer, size_t size)
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		if (WriteQueue.empty())
+		{
+			nosEngine.LogE("(Device %d) %s DMA Write: No frame available to write", DeviceIndex, GetChannelName(Channel));
 			return;
+		}
 		frame = WriteQueue.front();
 	}
-	VideoFrame output(frame);
-	output.StartAccess(bmdBufferAccessWrite);
-	size_t actualBufferSize = frame->GetRowBytes() * frame->GetHeight();
-	auto videoBufferBytes = output.GetBytes();
-	if (videoBufferBytes && buffer)
 	{
-		if (size != actualBufferSize)
+		VideoFrame output(frame);
+		output.StartAccess(bmdBufferAccessWrite);
+		size_t actualBufferSize = frame->GetRowBytes() * frame->GetHeight();
+		auto videoBufferBytes = output.GetBytes();
+		if (videoBufferBytes && buffer)
 		{
-			nosEngine.LogW("(Device %d) %s DMA Write: Buffer size does not match frame size", DeviceIndex, GetChannelName(Channel));
+			if (size != actualBufferSize)
+			{
+				nosEngine.LogW("(Device %d) %s DMA Write: Buffer size does not match frame size", DeviceIndex, GetChannelName(Channel));
+			}
+			size_t copySize = std::min(size, actualBufferSize);
+			std::memcpy(videoBufferBytes, buffer, copySize);
 		}
-		size_t copySize = std::min(size, actualBufferSize);
-		std::memcpy(videoBufferBytes, buffer, copySize);
+		output.EndAccess();
 	}
-	output.EndAccess();
 	auto seconds = sw.Elapsed();
 	char watchLogBuf[128];
 	snprintf(watchLogBuf, sizeof(watchLogBuf), "DeckLink %d:%s DMAWrite", DeviceIndex, GetChannelName(Channel));
@@ -201,14 +216,19 @@ void OutputHandler::ScheduleNextFrame()
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		if (WriteQueue.empty())
+		{
+			nosEngine.LogE("(Device %d) %s DMA Write: No frame available to schedule next", DeviceIndex, GetChannelName(Channel));
 			return;
+		}
 		frame = WriteQueue.front();
 		WriteQueue.pop_front();
 	}
+
 	HRESULT result = Interface->ScheduleVideoFrame(frame, TotalFramesScheduled * FrameDuration, FrameDuration, TimeScale);
 	if (result != S_OK)
-		nosEngine.LogE("Failed to schedule video frame");
-	++TotalFramesScheduled;
+		nosEngine.LogE("(Device %d) %s DMA Write: Failed to schedule next frame", DeviceIndex, GetChannelName(Channel));
+	else
+		++TotalFramesScheduled;
 }
 
 void OutputHandler::ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result)
