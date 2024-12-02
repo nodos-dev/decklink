@@ -1,3 +1,4 @@
+// Copyright MediaZ Teknoloji A.S. All Rights Reserved.
 #include "OutputHandler.hpp"
 
 #include <Nodos/Modules.h>
