@@ -17,6 +17,7 @@ public:
 	SubDevice(IDeckLink* deviceInterface);
 	~SubDevice();
 	bool IsBusyWith(nosMediaIODirection mode);
+	bool IsBusy();
 	std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> GetSupportedOutputFrameGeometryAndFrameRates(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats);
 	std::map<nosMediaIOFrameGeometry, std::map<nosMediaIOFrameRate, std::set<nosMediaIOPixelFormat>>> GetSupportedOutputVideoFormats();
 	int32_t AddInputVideoFormatChangeCallback(nosDeckLinkInputVideoFormatChangeCallback callback, void* userData);

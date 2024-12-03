@@ -86,17 +86,22 @@ struct ChannelHandler
 		nosEngine.SetPinValue(FrameRatePinId, nos::Buffer(frameRateCstr, strlen(frameRateCstr) + 1));
 		nosEngine.SetPinValue(PixelFormatPinId, nos::Buffer(pixelFormatCstr, strlen(pixelFormatCstr) + 1));
 	}
+
+	bool CanOpen()
+	{
+		if (!ShouldOpen || DeviceIndex == -1 || Channel == NOS_DECKLINK_CHANNEL_INVALID)
+			return false;
+		if (Direction == NOS_MEDIAIO_DIRECTION_OUTPUT)
+			return Resolution != NOS_MEDIAIO_FRAME_GEOMETRY_INVALID && FrameRate != NOS_MEDIAIO_FRAME_RATE_INVALID && PixelFormat != NOS_MEDIAIO_PIXEL_FORMAT_INVALID;
+		return true;
+	}
 	
 	bool Open()
 	{
-		if (!ShouldOpen)
-			return false;
-		if (DeviceIndex == -1)
-			return false;
-		if (Channel == NOS_DECKLINK_CHANNEL_INVALID)
-			return false;
 		if (IsOpen)
 			return true;
+		if (!CanOpen())
+			return false;
 		nosDeckLinkOpenChannelParams params {
 			.Direction = Direction,
 			.Channel = Channel,

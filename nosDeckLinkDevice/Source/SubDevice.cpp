@@ -94,6 +94,11 @@ bool SubDevice::IsBusyWith(nosMediaIODirection mode)
 	return false;
 }
 
+bool SubDevice::IsBusy()
+{
+	return Input.IsCurrentlyOpen() || Output.IsCurrentlyOpen();
+}
+
 std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> SubDevice::GetSupportedOutputFrameGeometryAndFrameRates(std::unordered_set<nosMediaIOPixelFormat> const& pixelFormats)
 {
 	std::map<nosMediaIOFrameGeometry, std::set<nosMediaIOFrameRate>> supported;

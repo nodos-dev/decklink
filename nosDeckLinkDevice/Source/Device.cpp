@@ -197,7 +197,7 @@ bool Device::CanOpenChannel(nosMediaIODirection dir, nosDeckLinkChannel channel,
 		if (cit != dit->second.end())
 		{
 			auto* subDevice = cit->second;
-			if (!subDevice->IsBusyWith(dir))
+			if (!subDevice->IsBusy())
 			{
 				if (outSubDevice)
 					*outSubDevice = subDevice;
