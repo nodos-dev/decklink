@@ -3257,6 +3257,7 @@
       "function_category": "Default Node",
       "status_messages": [],
       "meta_data_map": [
+        { "key": "NodeStatusPortal", "value": "/Channel" },
         { "key": "PluginVersion", "value": "0.1.0" }
       ],
       "description": "",

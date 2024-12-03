@@ -121,6 +121,24 @@ nosResult NOSAPI_CALL GetDeviceByUniqueDisplayName(const char* uniqueDisplayName
 	}
 	return NOS_RESULT_NOT_FOUND;
 }
+	
+nosResult NOSAPI_CALL GetDeviceInfoByIndex(uint32_t deviceIndex, nosDeckLinkDeviceInfo* outInfo)
+{
+	auto& devices = GInstance->GetDevices();
+	if (deviceIndex >= devices.size())
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	auto& device = devices[deviceIndex];
+	strncpy(outInfo->ModelName, device->ModelName.c_str(), device->ModelName.size() + 1);
+	outInfo->Desc.DeviceIndex = device->Index;
+	auto uniqueDisplayName = device->GetUniqueDisplayName();
+	size_t maxSize = sizeof(outInfo->Desc.UniqueDisplayName);
+	strncpy(outInfo->Desc.UniqueDisplayName, uniqueDisplayName.c_str(), std::min(uniqueDisplayName.size() + 1, maxSize));
+	return NOS_RESULT_SUCCESS;
+}
+
 
 nosResult NOSAPI_CALL GetSupportedOutputFrameGeometries(uint32_t deviceIndex, nosDeckLinkChannel channel, nosMediaIOFrameGeometryList* outGeometries)
 {
@@ -338,6 +356,7 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->GetChannelName = GetChannelName;
 	subsystem->GetChannelByName = GetChannelByName;
 	subsystem->GetDeviceByUniqueDisplayName = GetDeviceByUniqueDisplayName;
+	subsystem->GetDeviceInfoByIndex = GetDeviceInfoByIndex;
 	subsystem->GetSupportedOutputFrameGeometries = GetSupportedOutputFrameGeometries;
 	subsystem->GetSupportedOutputFrameRatesForGeometry = GetSupportedOutputFrameRatesForGeometry;
 	subsystem->GetSupportedOutputPixelFormats = GetSupportedOutputPixelFormats;

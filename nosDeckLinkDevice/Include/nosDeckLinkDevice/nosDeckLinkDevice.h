@@ -20,6 +20,12 @@ typedef struct nosDeckLinkDeviceDesc {
 	char UniqueDisplayName[256];
 } nosDeckLinkDeviceDesc;
 
+typedef struct nosDeckLinkDeviceInfo
+{
+	nosDeckLinkDeviceDesc Desc;
+	char ModelName[256];
+} nosDeckLinkDeviceInfo;
+	
 typedef enum nosDeckLinkChannel
 {
 	NOS_DECKLINK_CHANNEL_INVALID,
@@ -74,6 +80,7 @@ typedef struct nosDeckLinkSubsystem {
 	const char*			(NOSAPI_CALL* GetChannelName)(nosDeckLinkChannel channel);
 	nosDeckLinkChannel	(NOSAPI_CALL* GetChannelByName)(const char* channelName);
 	nosResult			(NOSAPI_CALL* GetDeviceByUniqueDisplayName)(const char* uniqueDisplayName, uint32_t* outDeviceIndex);
+	nosResult			(NOSAPI_CALL* GetDeviceInfoByIndex)(uint32_t deviceIndex, nosDeckLinkDeviceInfo* outInfo);
 
 	// Channels
 	nosResult (NOSAPI_CALL* GetSupportedOutputFrameGeometries)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosMediaIOFrameGeometryList* outGeometries);

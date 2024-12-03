@@ -41,6 +41,7 @@ void InputVideoFormatChanged(void* userData, nosMediaIOFrameGeometry frameGeomet
 	
 struct ChannelHandler
 {
+	class ChannelNode* Node;
 	bool ShouldOpen = true;
 	bool IsOpen = false;
 	bool IsStreamStarted = false;
@@ -49,7 +50,7 @@ struct ChannelHandler
 	nosUUID OutPixelFormatPinId;
 	nosUUID ResolutionPinId;
 	nosUUID FrameRatePinId;
-	nosUUID PixelFormatPinId;
+	nosUUID PixelFormatPinId; 
 	int32_t DeviceIndex = -1;
 	nosMediaIODirection Direction = NOS_MEDIAIO_DIRECTION_OUTPUT;
 	nosDeckLinkChannel Channel = NOS_DECKLINK_CHANNEL_INVALID;
@@ -66,10 +67,15 @@ struct ChannelHandler
 		if (reopen && IsOpen)
 			Close();
 		this->*Member = value;
-		UpdateResolutionAndPixelFormat();
+		UpdateChannelStatusAndOutPins();
 		if (reopen && !Open())
 			return ChannelUpdateResult::UnsupportedSettings;
 		return ChannelUpdateResult::Opened;
+	}
+
+	ChannelHandler(ChannelNode* node) : Node(node)
+	{
+		UpdateChannelStatus();
 	}
 
 	~ChannelHandler()
@@ -82,9 +88,13 @@ struct ChannelHandler
 		const char* frameGeometryCstr = nosMediaIO->GetFrameGeometryName(frameGeometry);
 		const char* frameRateCstr = nosMediaIO->GetFrameRateName(frameRate);
 		const char* pixelFormatCstr = nosMediaIO->GetPixelFormatName(pixelFormat);
+		Resolution = frameGeometry;
+		FrameRate = frameRate;
+		PixelFormat = pixelFormat;
 		nosEngine.SetPinValue(ResolutionPinId, nos::Buffer(frameGeometryCstr, strlen(frameGeometryCstr) + 1));
 		nosEngine.SetPinValue(FrameRatePinId, nos::Buffer(frameRateCstr, strlen(frameRateCstr) + 1));
 		nosEngine.SetPinValue(PixelFormatPinId, nos::Buffer(pixelFormatCstr, strlen(pixelFormatCstr) + 1));
+		UpdateChannelStatus();
 	}
 
 	bool CanOpen()
@@ -118,14 +128,15 @@ struct ChannelHandler
 			VideoInputChangeCallbackId = nosDeckLink->RegisterInputVideoFormatChangeCallback(DeviceIndex, Channel, &InputVideoFormatChanged, this);
 		}
 		auto res = nosDeckLink->OpenChannel(DeviceIndex, &params);
-		if (res != NOS_RESULT_SUCCESS)
-			return false;
-		IsOpen = true;
-		ChannelId id(DeviceIndex, Channel, Direction);
-		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(id));
-		UpdateResolutionAndPixelFormat();
-		nosEngine.SendPathRestart(OutChannelPinId);
-		return true;
+		if (res == NOS_RESULT_SUCCESS)
+		{
+			IsOpen = true;
+			ChannelId id(DeviceIndex, Channel, Direction);
+			nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(id));
+			nosEngine.SendPathRestart(OutChannelPinId);
+		}
+		UpdateChannelStatusAndOutPins();
+		return res == NOS_RESULT_SUCCESS;
 	}
 
 	void StartIfOpen()
@@ -144,15 +155,50 @@ struct ChannelHandler
 	{
 		if (Direction == NOS_MEDIAIO_DIRECTION_INPUT)
 			nosDeckLink->UnregisterInputVideoFormatChangeCallback(DeviceIndex, Channel, VideoInputChangeCallbackId);
-
 		nosDeckLink->CloseChannel(DeviceIndex, Channel);
 		IsOpen = false;
 		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId(-1, 0, false)));
 		nosEngine.SetPinValue(OutResolutionPinId, nos::Buffer::From(nosVec2u{ 0, 0 }));
 		nosEngine.SendPathRestart(OutChannelPinId);
+		auto [type, text] = GetChannelStatusString();
+		SetStatus(StatusType::Channel, type, text);
+		UpdateStatus();
 	}
 
-	void UpdateResolutionAndPixelFormat()
+	std::pair<fb::NodeStatusMessageType, std::string> GetChannelStatusString()
+	{
+		std::string channelString = nosDeckLink->GetChannelName(Channel);
+		channelString += " ";
+		if (Resolution != NOS_MEDIAIO_FRAME_GEOMETRY_INVALID)
+		{
+			channelString += nosMediaIO->GetFrameGeometryName(Resolution);
+			channelString += " ";
+		}
+		if (FrameRate != NOS_MEDIAIO_FRAME_RATE_INVALID)
+			channelString += nosMediaIO->GetFrameRateName(FrameRate);
+		if (ShouldOpen && IsOpen)
+		{
+			return {fb::NodeStatusMessageType::INFO, channelString};
+		}
+		if (ShouldOpen && !IsOpen && CanOpen())
+		{
+			return {fb::NodeStatusMessageType::FAILURE, "Failed to open: " + channelString};
+		}
+		if (!ShouldOpen)
+		{
+			return {fb::NodeStatusMessageType::WARNING, "Channel closed"};
+		}
+		return { fb::NodeStatusMessageType::WARNING, "Idle" };
+	}
+
+	void UpdateChannelStatus()
+	{
+		auto [type, text] = GetChannelStatusString();
+		SetStatus(StatusType::Channel, type, text);
+		UpdateStatus();
+	}
+
+	void UpdateOutPins()
 	{
 		nosVec2u resolution{};
 		nosMediaIO->Get2DFrameResolution(Resolution, &resolution);
@@ -169,17 +215,39 @@ struct ChannelHandler
 		}
 		nosEngine.SetPinValue(OutPixelFormatPinId, nos::Buffer::From(ycbcrFormat));
 	}
+
+	void UpdateChannelStatusAndOutPins()
+	{
+		UpdateChannelStatus();
+		UpdateOutPins();
+	}
+	
+	void UpdateStatus();
+
+	enum class StatusType
+	{
+		Channel,
+		Reference,
+		ReferenceInvalid,
+		DeltaSecondsCompatible,
+		Firmware,
+		DropCount,
+	};
+
+	void SetStatus(StatusType statusType, fb::NodeStatusMessageType msgType, std::string text);
+	void ClearStatus(StatusType statusType);
+	std::map<StatusType, fb::TNodeStatusMessage> StatusMessages;
 };
 
 void InputVideoFormatChanged(void* userData, nosMediaIOFrameGeometry frameGeometry, nosMediaIOFrameRate frameRate, nosMediaIOPixelFormat pixelFormat)
 {
 	static_cast<ChannelHandler*>(userData)->OnInputVideoFormatChanged_DeckLinkThread(frameGeometry, frameRate, pixelFormat);
 }
-	
+
 class ChannelNode : public nos::NodeContext
 {
 public:
-	ChannelNode(const nosFbNode* node) : NodeContext(node)
+	ChannelNode(const nosFbNode* node) : NodeContext(node), Channel(this)
 	{
 		SetPinVisualizer(NSN_Device, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetDeviceStringListName()});
 		SetPinVisualizer(NSN_ChannelName, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetChannelStringListName()});
@@ -470,6 +538,34 @@ public:
 		Channel.StopIfOpen();
 	}
 };
+
+void ChannelHandler::UpdateStatus()
+{
+	std::vector<fb::TNodeStatusMessage> messages;
+	if (DeviceIndex == -1)
+		messages.push_back(fb::TNodeStatusMessage{{}, "No device selected", fb::NodeStatusMessageType::WARNING});
+	else
+	{
+		nosDeckLinkDeviceInfo deviceInfo{};
+		nosDeckLink->GetDeviceInfoByIndex(DeviceIndex, &deviceInfo);
+		messages.push_back(fb::TNodeStatusMessage{{}, deviceInfo.ModelName, fb::NodeStatusMessageType::INFO});
+	}
+	for (auto& [type, message] : StatusMessages)
+		messages.push_back(message);
+	Node->SetNodeStatusMessages(messages);
+}
+
+void ChannelHandler::SetStatus(StatusType statusType, fb::NodeStatusMessageType msgType, std::string text)
+{
+	StatusMessages[statusType] = fb::TNodeStatusMessage{{}, std::move(text), msgType};
+	UpdateStatus();
+}
+
+void ChannelHandler::ClearStatus(StatusType statusType)
+{
+	StatusMessages.erase(statusType);
+	UpdateStatus();
+}
 
 nosResult RegisterChannelNode(nosNodeFunctions* funcs)
 {
