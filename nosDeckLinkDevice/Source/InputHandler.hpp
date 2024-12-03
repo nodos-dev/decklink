@@ -29,6 +29,8 @@ struct InputHandler : IOHandlerBase<IDeckLinkInput>
 	std::mutex CallbacksMutex;
 	std::unordered_map<int32_t, std::pair<nosDeckLinkInputVideoFormatChangeCallback, void*>> VideoFormatChangeCallbacks;
 	int32_t NextCallbackId = 0;
+
+	
 	
 protected:
 	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) override;

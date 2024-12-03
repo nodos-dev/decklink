@@ -110,11 +110,11 @@ void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* 
 		std::unique_lock lock(ReadFramesMutex);
 		if (ReadFrames.size() > 1)
 		{
-			// TODO: Call drop callbacks
-			++DropCount;
+			OnFrameEnd(NOS_DECKLINK_FRAME_DROPPED);
 			return;
 		}
 	}
+	OnFrameEnd(NOS_DECKLINK_FRAME_COMPLETED);
 	auto inputFrame = std::make_unique<VideoFrame>(frame);
 	inputFrame->StartAccess(bmdBufferAccessRead);
 	{

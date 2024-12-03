@@ -94,16 +94,14 @@ private:
 struct IOHandlerBaseI
 {
 	virtual ~IOHandlerBaseI() = default;
-
 	// Info
 	nosDeckLinkChannel Channel = NOS_DECKLINK_CHANNEL_INVALID;
 	uint32_t DeviceIndex = -1;
 
 	BMDTimeValue FrameDuration = 0;
 	BMDTimeScale TimeScale = 0;
-
-	// Runtime
-	std::atomic_uint32_t DropCount = 0;
+	
+	uint32_t FramesProcessed = 0;
 
 	virtual bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) = 0;
 	virtual bool Close() = 0;
@@ -116,10 +114,23 @@ struct IOHandlerBaseI
 	virtual bool WaitFrame(std::chrono::milliseconds timeout) = 0;
 	virtual void DmaTransfer(void* buffer, size_t size) = 0;
 	std::optional<nosVec2u> GetDeltaSeconds() const;
+	int32_t AddFrameResultCallback(nosDeckLinkFrameResultCallback callback, void* userData);
+	void RemoveFrameResultCallback(int32_t callbackId);
 
 protected:
 	virtual bool Start() = 0;
 	virtual bool Stop() = 0;
+	void OnFrameEnd(nosDeckLinkFrameResult result)
+	{
+		++FramesProcessed;
+		for (auto& [callbackId, pair] : FrameResultCallbacks)
+		{
+			auto& [callback, userData] = pair;
+			callback(userData, result, FramesProcessed);
+		}
+	}
+	std::unordered_map<int32_t, std::pair<nosDeckLinkFrameResultCallback, void*>> FrameResultCallbacks;
+	int32_t NextFrameResultCallbackId = 0;
 private:
 	bool IsOpen = false;
 	bool IsStreamRunning = false;
@@ -169,7 +180,7 @@ inline bool IOHandlerBaseI::StartStream()
 		return false;
 	if (IsStreamRunning)
 		return true;
-	DropCount = 0;
+	FramesProcessed = 0;
 	if (Start())
 	{
 		IsStreamRunning = true;
@@ -213,4 +224,14 @@ inline std::optional<nosVec2u> IOHandlerBaseI::GetDeltaSeconds() const
 	return nosVec2u{ (uint32_t)FrameDuration, (uint32_t)TimeScale };
 }
 
+inline int32_t IOHandlerBaseI::AddFrameResultCallback(nosDeckLinkFrameResultCallback callback, void* userData)
+{
+	FrameResultCallbacks[NextFrameResultCallbackId] = { callback, userData };
+	return NextFrameResultCallbackId++;
+}
+
+inline void IOHandlerBaseI::RemoveFrameResultCallback(int32_t callbackId)
+{
+	FrameResultCallbacks.erase(callbackId);
+}
 }

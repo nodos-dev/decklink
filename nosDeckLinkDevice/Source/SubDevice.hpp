@@ -22,6 +22,8 @@ public:
 	std::map<nosMediaIOFrameGeometry, std::map<nosMediaIOFrameRate, std::set<nosMediaIOPixelFormat>>> GetSupportedOutputVideoFormats();
 	int32_t AddInputVideoFormatChangeCallback(nosDeckLinkInputVideoFormatChangeCallback callback, void* userData);
 	void RemoveInputVideoFormatChangeCallback(uint32_t callbackId);
+	int32_t AddFrameResultCallback(nosMediaIODirection dir, nosDeckLinkFrameResultCallback callback, void* user_data);
+	void RemoveFrameResultCallback(nosMediaIODirection dir, uint32_t callbackId);
 
 	std::string ModelName;
 	int64_t SubDeviceIndex = -1;

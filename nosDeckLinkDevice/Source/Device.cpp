@@ -220,6 +220,14 @@ SubDevice* Device::GetSubDeviceOfChannel(nosMediaIODirection dir, nosDeckLinkCha
 	return nullptr;
 }
 
+std::pair<SubDevice*, nosMediaIODirection> Device::GetSubDeviceOfOpenChannel(nosDeckLinkChannel channel) const
+{
+	auto it = OpenChannels.find(channel);
+	if (it != OpenChannels.end())
+		return it->second;
+	return {nullptr, {}};
+}
+
 SubDevice* Device::GetSubDevice(int64_t index) const
 {
 	if (index < SubDevices.size())

@@ -296,7 +296,7 @@ int32_t NOSAPI_CALL RegisterInputVideoFormatChangeCallback(uint32_t deviceIndex,
 	auto* subDevice = device->GetSubDeviceOfChannel(NOS_MEDIAIO_DIRECTION_INPUT, channel);
 	if (!subDevice)
 	{
-		nosEngine.LogE("No such sub-device for channel %s", GetChannelName(channel));
+		nosEngine.LogE("No sub-device found for channel %s", GetChannelName(channel));
 		return -1;
 	}
 	return subDevice->AddInputVideoFormatChangeCallback(callback, userData);
@@ -313,7 +313,7 @@ nosResult NOSAPI_CALL UnregisterInputVideoFormatChangeCallback(uint32_t deviceIn
 	auto* subDevice = device->GetSubDeviceOfChannel(NOS_MEDIAIO_DIRECTION_INPUT, channel);
 	if (!subDevice)
 	{
-		nosEngine.LogE("No such sub-device for channel %s", GetChannelName(channel));
+		nosEngine.LogE("No sub-device found for channel %s", GetChannelName(channel));
 		return NOS_RESULT_NOT_FOUND;
 	}
 	subDevice->RemoveInputVideoFormatChangeCallback(callbackId);
@@ -340,6 +340,41 @@ nosResult NOSAPI_CALL StopStream(uint32_t deviceIndex, nosDeckLinkChannel channe
 		return NOS_RESULT_NOT_FOUND;
 	}
 	return device->StopStream(channel) ? NOS_RESULT_SUCCESS : NOS_RESULT_FAILED;
+}
+
+int32_t NOSAPI_CALL RegisterFrameResultCallback(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkFrameResultCallback callback, void* userData)
+{
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	auto [subDevice, dir] = device->GetSubDeviceOfOpenChannel(channel);
+	if (!subDevice)
+	{
+		nosEngine.LogE("No sub-device found open channel %s", GetChannelName(channel));
+		return -1;
+	}
+	return subDevice->AddFrameResultCallback(dir, callback, userData);
+}
+
+nosResult NOSAPI_CALL UnregisterFrameResultCallback(uint32_t deviceIndex, nosDeckLinkChannel channel, int32_t callbackId)
+{
+	auto* device = GInstance->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	auto [subDevice, dir] = device->GetSubDeviceOfOpenChannel(channel);
+	if (!subDevice)
+	{
+		nosEngine.LogE("No sub-device found open channel %s", GetChannelName(channel));
+		return NOS_RESULT_NOT_FOUND;
+	}
+	subDevice->RemoveFrameResultCallback(dir, callbackId);
+	return NOS_RESULT_SUCCESS;	
 }
 
 nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
@@ -369,6 +404,8 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->UnregisterInputVideoFormatChangeCallback = UnregisterInputVideoFormatChangeCallback;
 	subsystem->StartStream = StartStream;
 	subsystem->StopStream = StopStream;
+	subsystem->RegisterFrameResultCallback = RegisterFrameResultCallback;
+	subsystem->UnregisterFrameResultCallback = UnregisterFrameResultCallback;
 	*outSubsystemContext = subsystem;
 	GExportedSubsystemVersions[minorVersion] = subsystem;
 	return NOS_RESULT_SUCCESS;

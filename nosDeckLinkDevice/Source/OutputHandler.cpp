@@ -113,6 +113,7 @@ bool OutputHandler::Start()
 	{
 		std::unique_lock lock(VideoFramesMutex);
 		TotalFramesScheduled = 0;
+		FramePointFirstDisplayedLate = -1;
 		WriteQueue.clear();
 		for (auto& frame : VideoFrames)
 			WriteQueue.push_back(frame);
@@ -242,14 +243,23 @@ void OutputHandler::ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* 
 		nosEngine.WatchLog(buffer, std::to_string(WriteQueue.size()).c_str());
 	}
 	WriteCond.notify_one();
-	if (result != bmdOutputFrameCompleted)
+	nosDeckLinkFrameResult frameResult = NOS_DECKLINK_FRAME_COMPLETED;
+	switch (result)
 	{
-		if (result == bmdOutputFrameDropped)
+	case bmdOutputFrameCompleted:
+	case bmdOutputFrameFlushed:
+		return;
+	case bmdOutputFrameDisplayedLate:
+		if (FramePointFirstDisplayedLate == -1)
 		{
-			// TODO: Call drop callbacks
-			++DropCount;
+			FramePointFirstDisplayedLate = TotalFramesScheduled;
+			frameResult = NOS_DECKLINK_FRAME_DROPPED;
 		}
-		// TODO: Track first Displayed-Late and calculate drops
+		break;
+	case bmdOutputFrameDropped:
+		frameResult = NOS_DECKLINK_FRAME_DROPPED;
+		break;
 	}
+	OnFrameEnd(frameResult);
 }
 }

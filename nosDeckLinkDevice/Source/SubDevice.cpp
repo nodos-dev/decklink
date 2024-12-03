@@ -164,6 +164,16 @@ void SubDevice::RemoveInputVideoFormatChangeCallback(uint32_t callbackId)
 	Input.RemoveInputVideoFormatChangeCallback(callbackId);
 }
 
+int32_t SubDevice::AddFrameResultCallback(nosMediaIODirection dir, nosDeckLinkFrameResultCallback callback, void* userData)
+{
+	return GetIO(dir).AddFrameResultCallback(callback, userData);
+}
+
+void SubDevice::RemoveFrameResultCallback(nosMediaIODirection dir, uint32_t callbackId)
+{
+	GetIO(dir).RemoveFrameResultCallback(callbackId);
+}
+
 bool SubDevice::StartStream(nosMediaIODirection mode)
 {
 	return GetIO(mode).StartStream();

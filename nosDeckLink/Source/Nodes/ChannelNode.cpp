@@ -38,6 +38,7 @@ enum class ChannelUpdateResult
 };
 
 void InputVideoFormatChanged(void* userData, nosMediaIOFrameGeometry frameGeometry, nosMediaIOFrameRate frameRate, nosMediaIOPixelFormat pixelFormat);
+void FrameResultCallback(void* userData, nosDeckLinkFrameResult result, uint32_t processedFrameNumber);
 	
 struct ChannelHandler
 {
@@ -58,6 +59,14 @@ struct ChannelHandler
 	nosMediaIOFrameRate FrameRate = NOS_MEDIAIO_FRAME_RATE_INVALID;
 	nosMediaIOPixelFormat PixelFormat = NOS_MEDIAIO_PIXEL_FORMAT_INVALID;
 	int32_t VideoInputChangeCallbackId = -1;
+	int32_t FrameResultCallbackId = -1;
+
+	struct
+	{
+		uint32_t DropCount = 0;
+		uint32_t FramesSinceLastDrop = 0;
+		bool DropDetected = false;
+	} DeckLinkThread;
 
 	template<auto Member, typename T>
 	ChannelUpdateResult Update(const T& value, bool reopen = true)
@@ -97,6 +106,33 @@ struct ChannelHandler
 		UpdateChannelStatus();
 	}
 
+	void OnFrameEnd_DeckLinkThread(nosDeckLinkFrameResult result, uint32_t processedFrameNumber)
+	{
+		switch (result)
+		{
+		case NOS_DECKLINK_FRAME_DROPPED:
+		{
+			++DeckLinkThread.DropCount;
+			DeckLinkThread.FramesSinceLastDrop = 0;
+			DeckLinkThread.DropDetected = true;
+			SetStatus(StatusType::DropCount, fb::NodeStatusMessageType::WARNING, "Drop Count: " + std::to_string(DeckLinkThread.DropCount));
+			UpdateStatus();
+			break;
+		}
+		case NOS_DECKLINK_FRAME_COMPLETED:
+		{
+			if (DeckLinkThread.DropDetected)
+				++DeckLinkThread.FramesSinceLastDrop;
+			if (DeckLinkThread.FramesSinceLastDrop > 50)
+			{
+				nosEngine.LogW("Requesting path restart due to frame drops");
+				nosEngine.SendPathRestart(OutChannelPinId);
+			}
+			break;
+		}
+		}
+	}
+
 	bool CanOpen()
 	{
 		if (!ShouldOpen || DeviceIndex == -1 || Channel == NOS_DECKLINK_CHANNEL_INVALID)
@@ -134,6 +170,7 @@ struct ChannelHandler
 			ChannelId id(DeviceIndex, Channel, Direction);
 			nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(id));
 			nosEngine.SendPathRestart(OutChannelPinId);
+			FrameResultCallbackId = nosDeckLink->RegisterFrameResultCallback(DeviceIndex, Channel, &FrameResultCallback, this);
 		}
 		UpdateChannelStatusAndOutPins();
 		return res == NOS_RESULT_SUCCESS;
@@ -148,13 +185,18 @@ struct ChannelHandler
 	void StopIfOpen()
 	{
 		if (IsOpen)
+		{
 			nosDeckLink->StopStream(DeviceIndex, Channel);
+			ClearStatus(StatusType::DropCount);
+			DeckLinkThread = {};
+		}
 	}
 
 	void Close()
 	{
 		if (Direction == NOS_MEDIAIO_DIRECTION_INPUT)
 			nosDeckLink->UnregisterInputVideoFormatChangeCallback(DeviceIndex, Channel, VideoInputChangeCallbackId);
+		nosDeckLink->UnregisterFrameResultCallback(DeviceIndex, Channel, FrameResultCallbackId);
 		nosDeckLink->CloseChannel(DeviceIndex, Channel);
 		IsOpen = false;
 		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId(-1, 0, false)));
@@ -243,6 +285,12 @@ void InputVideoFormatChanged(void* userData, nosMediaIOFrameGeometry frameGeomet
 {
 	static_cast<ChannelHandler*>(userData)->OnInputVideoFormatChanged_DeckLinkThread(frameGeometry, frameRate, pixelFormat);
 }
+
+void FrameResultCallback(void* userData, nosDeckLinkFrameResult result, uint32_t processedFrameNumber)
+{
+	static_cast<ChannelHandler*>(userData)->OnFrameEnd_DeckLinkThread(result, processedFrameNumber);
+}
+
 
 class ChannelNode : public nos::NodeContext
 {

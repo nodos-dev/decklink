@@ -41,6 +41,7 @@ public:
 	void UpdateProfile(BMDProfileID profileId);
 
 	SubDevice* GetSubDeviceOfChannel(nosMediaIODirection dir, nosDeckLinkChannel channel) const;
+	std::pair<SubDevice*, nosMediaIODirection> GetSubDeviceOfOpenChannel(nosDeckLinkChannel channel) const;
 	SubDevice* GetSubDevice(int64_t index) const;
 
 	// Channels

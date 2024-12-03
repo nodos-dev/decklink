@@ -72,7 +72,14 @@ typedef struct nosDeckLinkOpenChannelParams
 	} Output; // Don't care if Direction == NOS_MEDIAIO_DIRECTION_INPUT
 } nosDeckLinkOpenOutputParams;
 
+typedef enum nosDeckLinkFrameResult
+{
+	NOS_DECKLINK_FRAME_COMPLETED, // Frame arrived if it's an input channel, frame displayed if it's an output channel
+	NOS_DECKLINK_FRAME_DROPPED,
+} nosDeckLinkFrameResult;
+
 typedef void (NOSAPI_CALL* nosDeckLinkInputVideoFormatChangeCallback)(void* userData, nosMediaIOFrameGeometry geometry, nosMediaIOFrameRate frameRate, nosMediaIOPixelFormat pixelFormat);
+typedef void (NOSAPI_CALL* nosDeckLinkFrameResultCallback)(void* userData, nosDeckLinkFrameResult result, uint32_t processedFrameNumber);
 
 typedef struct nosDeckLinkSubsystem {
 	void				(NOSAPI_CALL* GetDevices)(size_t *inoutCount, nosDeckLinkDeviceDesc* outDeviceDescriptors);
@@ -91,6 +98,8 @@ typedef struct nosDeckLinkSubsystem {
 	nosResult (NOSAPI_CALL* GetCurrentDeltaSecondsOfChannel)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosVec2u* outDeltaSeconds);
 	int32_t   (NOSAPI_CALL* RegisterInputVideoFormatChangeCallback)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkInputVideoFormatChangeCallback callback, void* userData);
 	nosResult (NOSAPI_CALL* UnregisterInputVideoFormatChangeCallback)(uint32_t deviceIndex, nosDeckLinkChannel channel, int32_t callbackId);
+	int32_t   (NOSAPI_CALL* RegisterFrameResultCallback)(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkFrameResultCallback callback, void* userData);
+	nosResult (NOSAPI_CALL* UnregisterFrameResultCallback)(uint32_t deviceIndex, nosDeckLinkChannel channel, int32_t callbackId);
 
 	// I/O
 	nosResult (NOSAPI_CALL* WaitFrame)(uint32_t deviceIndex, nosDeckLinkChannel channel, uint32_t timeoutMs);
