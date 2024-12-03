@@ -110,7 +110,8 @@ void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* 
 		std::unique_lock lock(ReadFramesMutex);
 		if (ReadFrames.size() > 1)
 		{
-			// TODO: Call drop callbacks & track drops
+			// TODO: Call drop callbacks
+			++DropCount;
 			return;
 		}
 	}

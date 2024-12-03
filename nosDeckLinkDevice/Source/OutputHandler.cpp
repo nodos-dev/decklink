@@ -244,13 +244,12 @@ void OutputHandler::ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* 
 	WriteCond.notify_one();
 	if (result != bmdOutputFrameCompleted)
 	{
-		const char* resultStr = nullptr;
-		switch (result) {
-		case bmdOutputFrameDropped: resultStr = "'Dropped'"; break;
-		case bmdOutputFrameDisplayedLate: resultStr = "'DisplayedLate'"; break;
-		case bmdOutputFrameFlushed: resultStr = "'Flushed'"; break;
+		if (result == bmdOutputFrameDropped)
+		{
+			// TODO: Call drop callbacks
+			++DropCount;
 		}
-		nosEngine.LogW("(Device %d) %s Output %s", DeviceIndex, GetChannelName(Channel), resultStr);
+		// TODO: Track first Displayed-Late and calculate drops
 	}
 }
 }

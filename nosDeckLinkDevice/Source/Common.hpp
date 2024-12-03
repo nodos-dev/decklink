@@ -102,6 +102,9 @@ struct IOHandlerBaseI
 	BMDTimeValue FrameDuration = 0;
 	BMDTimeScale TimeScale = 0;
 
+	// Runtime
+	std::atomic_uint32_t DropCount = 0;
+
 	virtual bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) = 0;
 	virtual bool Close() = 0;
 
@@ -166,6 +169,7 @@ inline bool IOHandlerBaseI::StartStream()
 		return false;
 	if (IsStreamRunning)
 		return true;
+	DropCount = 0;
 	if (Start())
 	{
 		IsStreamRunning = true;
