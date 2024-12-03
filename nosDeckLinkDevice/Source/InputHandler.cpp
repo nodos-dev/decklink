@@ -105,6 +105,15 @@ void InputHandler::OnInputFrameArrived_DeckLinkThread(IDeckLinkVideoInputFrame* 
 	auto res = frame->GetStreamTime(&frameTime, &frameDuration, TimeScale);
 	if (res != S_OK)
 		return;
+	// TODO: Additionally check for frameTime and frameDuration for drops
+	{
+		std::unique_lock lock(ReadFramesMutex);
+		if (ReadFrames.size() > 1)
+		{
+			// TODO: Call drop callbacks & track drops
+			return;
+		}
+	}
 	auto inputFrame = std::make_unique<VideoFrame>(frame);
 	inputFrame->StartAccess(bmdBufferAccessRead);
 	{
