@@ -16,9 +16,9 @@ set(FLATC_EXECUTABLE ${NOS_SDK_DIR}/bin/flatc${CMAKE_EXECUTABLE_SUFFIX})
 # nos.sys.mediaio
 nos_get_module("nos.sys.mediaio" "0.1" NOS_SYS_MEDIAIO_TARGET_0_1)
 nos_find_module_path("nos.sys.mediaio" "0.1" NOS_SYS_MEDIAIO_PATH)
-nos_generate_flatbuffers("${NOS_SYS_MEDIAIO_PATH}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Source/Generated" "cpp" "${NOS_SYS_MEDIAIO_PATH};${NOS_SDK_DIR}/types" generated_nosDeckLinkDevice_dep_nosSysMediaIO)
+nos_generate_flatbuffers("${NOS_SYS_MEDIAIO_PATH}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Source/Generated" "cpp" "${NOS_SYS_MEDIAIO_PATH};${NOS_SDK_DIR}/types" generated_nosDeckLinkSubsystem_dep_nosSysMediaIO)
 
-nos_generate_flatbuffers("${CMAKE_CURRENT_SOURCE_DIR}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Include/nosDeckLinkDevice" "cpp" "${NOS_SDK_DIR}/types" generated_nosDeckLinkDevice)
+nos_generate_flatbuffers("${CMAKE_CURRENT_SOURCE_DIR}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Include/nosDeckLinkSubsystem" "cpp" "${NOS_SDK_DIR}/types" generated_nosDeckLinkSubsystem)
 
 # DeckLink SDK
 # ------------
@@ -72,7 +72,7 @@ elseif(LINUX)
     target_include_directories(DeckLinkSDK INTERFACE ${DECKLINK_SDK_INCLUDE_DIR})
 endif()
 
-list(APPEND DEPENDENCIES ${NOS_SUBSYSTEM_SDK_TARGET} ${NOS_SYS_MEDIAIO_TARGET_0_1} generated_nosDeckLinkDevice generated_nosDeckLinkDevice_dep_nosSysMediaIO)
+list(APPEND DEPENDENCIES ${NOS_SUBSYSTEM_SDK_TARGET} ${NOS_SYS_MEDIAIO_TARGET_0_1} generated_nosDeckLinkSubsystem generated_nosDeckLinkSubsystem_dep_nosSysMediaIO)
 list(APPEND DEPENDENCIES DeckLinkSDK)
 list(APPEND INCLUDE_FOLDERS
      ${EXTERNAL_DIR}
@@ -80,9 +80,9 @@ list(APPEND INCLUDE_FOLDERS
      ${CMAKE_CURRENT_SOURCE_DIR}/Include
      ${CMAKE_CURRENT_BINARY_DIR})
 
-nos_add_subsystem("nosDeckLinkDevice" "${DEPENDENCIES}" "${INCLUDE_FOLDERS}")
+nos_add_subsystem("nosDeckLinkSubsystem" "${DEPENDENCIES}" "${INCLUDE_FOLDERS}")
 
-target_sources(nosDeckLinkDevice PRIVATE ${DECKLINK_SOURCES})
+target_sources(nosDeckLinkSubsystem PRIVATE ${DECKLINK_SOURCES})
 
 # Project generation
-nos_group_targets("nosDeckLinkDevice" "NOS Subsystems")
+nos_group_targets("nosDeckLinkSubsystem" "NOS Subsystems")

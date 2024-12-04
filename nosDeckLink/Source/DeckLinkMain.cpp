@@ -2,7 +2,7 @@
 
 #include <Nodos/PluginHelpers.hpp>
 #include <nosVulkanSubsystem/nosVulkanSubsystem.h>
-#include <nosDeckLinkDevice/nosDeckLinkDevice.h>
+#include <nosDeckLinkSubsystem/nosDeckLinkSubsystem.h>
 #include <nosMediaIO/nosMediaIO.h>
 
 NOS_INIT_WITH_MIN_REQUIRED_MINOR(0)

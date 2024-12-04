@@ -3,7 +3,7 @@
 
 #include <nosUtil/Stopwatch.hpp>
 
-#include <nosDeckLinkDevice/nosDeckLinkDevice.h>
+#include <nosDeckLinkSubsystem/nosDeckLinkSubsystem.h>
 
 #include "Generated/DeckLink_generated.h"
 

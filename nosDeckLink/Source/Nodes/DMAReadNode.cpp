@@ -3,7 +3,7 @@
 
 #include "Generated/DeckLink_generated.h"
 
-#include <nosDeckLinkDevice/nosDeckLinkDevice.h>
+#include <nosDeckLinkSubsystem/nosDeckLinkSubsystem.h>
 #include <nosUtil/Stopwatch.hpp>
 
 #include "nosVulkanSubsystem/Helpers.hpp"

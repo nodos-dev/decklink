@@ -13,7 +13,7 @@
 #include <Nodos/Types.h>
 #include <Nodos/Modules.h>
 
-#include "nosDeckLinkDevice/nosDeckLinkDevice.h"
+#include "nosDeckLinkSubsystem/nosDeckLinkSubsystem.h"
 
 namespace nos::decklink
 {

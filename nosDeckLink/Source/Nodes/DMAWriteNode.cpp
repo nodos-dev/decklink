@@ -3,7 +3,7 @@
 
 #include <nosVulkanSubsystem/nosVulkanSubsystem.h>
 #include <nosVulkanSubsystem/Helpers.hpp>
-#include <nosDeckLinkDevice/nosDeckLinkDevice.h>
+#include <nosDeckLinkSubsystem/nosDeckLinkSubsystem.h>
 
 #include <nosUtil/Stopwatch.hpp>
 

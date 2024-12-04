@@ -15,7 +15,7 @@ NOS_BEGIN_IMPORT_DEPS()
 	NOS_MEDIAIO_SUBSYSTEM_IMPORT()
 NOS_END_IMPORT_DEPS()
 
-#include "nosDeckLinkDevice/nosDeckLinkDevice.h"
+#include "nosDeckLinkSubsystem/nosDeckLinkSubsystem.h"
 #include "Device.hpp"
 #include "SubDevice.hpp"
 #include "DeviceManager.hpp"

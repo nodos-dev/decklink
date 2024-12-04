@@ -17,7 +17,7 @@
 #include <chrono>
 #include <string>
 
-#include "nosDeckLinkDevice/nosDeckLinkDevice.h"
+#include "nosDeckLinkSubsystem/nosDeckLinkSubsystem.h"
 
 namespace nos::decklink
 {

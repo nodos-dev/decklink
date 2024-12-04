@@ -2,7 +2,7 @@
 #pragma once
 
 #include "Common.hpp"
-#include "nosDeckLinkDevice/nosDeckLinkDevice.h"
+#include "nosDeckLinkSubsystem/nosDeckLinkSubsystem.h"
 #include "VideoFrame.hpp"
 
 namespace nos::decklink

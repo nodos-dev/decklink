@@ -5,7 +5,7 @@
 
 #include <DeckLinkAPI.h>
 #include <nosMediaIO/nosMediaIO.h>
-#include <nosDeckLinkDevice/nosDeckLinkDevice.h>
+#include <nosDeckLinkSubsystem/nosDeckLinkSubsystem.h>
 
 namespace nos::decklink
 {

@@ -1,7 +1,7 @@
 {
     "info": {
         "id": {
-            "name": "nos.device.decklink",
+            "name": "nos.sys.decklink",
             "version": "0.1.0"
         },
         "display_name": "DeckLink Subsystem",
@@ -14,7 +14,7 @@
         ],
         "category": "Device"
     },
-    "binary_path": "Binaries/nosDeckLinkDevice",
+    "binary_path": "Binaries/nosDeckLinkSubsystem",
     "custom_types": [
     ],
     "defaults": [
