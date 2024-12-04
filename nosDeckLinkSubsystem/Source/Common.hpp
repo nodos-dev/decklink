@@ -19,6 +19,8 @@
 
 #include "nosDeckLinkSubsystem/nosDeckLinkSubsystem.h"
 
+#include <Nodos/Modules.h>
+
 namespace nos::decklink
 {
 template <typename T>
@@ -81,6 +83,9 @@ inline HRESULT GetDeckLinkIterator(IDeckLinkIterator **deckLinkIterator)
 	{
 		result = E_FAIL;
 	}
+
+	if (FAILED(result))
+		nosEngine.LogE("A DeckLink iterator could not be created. The DeckLink drivers may not be installed.");
 
 	return result;
 }

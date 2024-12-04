@@ -111,7 +111,7 @@ typedef struct nosDeckLinkSubsystem {
 #pragma region Helper Declarations & Macros
 
 // Make sure these are same with nossys file.
-#define NOS_DECKLINK_DEVICE_SUBSYSTEM_NAME "nos.device.decklink"
+#define NOS_DECKLINK_DEVICE_SUBSYSTEM_NAME "nos.sys.decklink"
 #define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MAJOR 0
 #define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MINOR 1
 
