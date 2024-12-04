@@ -26,7 +26,7 @@ concurrency:
 jobs:
   call-release-modules:
     name: Release Modules
-    uses: nodos-dev/actions/.github/workflows/release-modules.yml@windows-only
+    uses: nodos-dev/actions/.github/workflows/release-modules.yml@main
     with:
       ref_name: ${{ github.ref_name }}
       build_all: ${{ github.event_name == 'workflow_dispatch' && fromJson(github.event.inputs.build_all) || false }}
