@@ -54,6 +54,36 @@ inline const std::function<dlstring_t(std::string)> StdToDlString = [](std::stri
 
 	return ret_str;
 };
+inline HRESULT GetDeckLinkIterator(IDeckLinkIterator **deckLinkIterator)
+{
+	HRESULT result = S_OK;
+
+	// Create an IDeckLinkIterator object to enumerate all DeckLink cards in the system
+	result = CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)deckLinkIterator);
+	if (FAILED(result))
+		nosEngine.LogE("A DeckLink iterator could not be created. The DeckLink drivers may not be installed.");
+
+	return result;
+}
+#else
+#define dlbool_t	bool
+#define dlstring_t	const char*
+#define BOOL bool
+const auto DeleteString = [](dlstring_t dl_str) { free((void*)dl_str); };
+const auto DlToStdString = [](dlstring_t dl_str) -> std::string { return dl_str; };
+inline HRESULT GetDeckLinkIterator(IDeckLinkIterator **deckLinkIterator)
+{
+	HRESULT result = S_OK;
+
+	// Create an IDeckLinkIterator object to enumerate all DeckLink cards in the system
+	*deckLinkIterator = CreateDeckLinkIteratorInstance();
+	if (*deckLinkIterator == NULL)
+	{
+		result = E_FAIL;
+	}
+
+	return result;
+}
 #endif
 
 

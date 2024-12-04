@@ -26,7 +26,7 @@ set(DECKLINK_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/DeckLinkSDK/")
 
 if (WIN32)
      # Add DeckLink API
-    set(PLATFORM_SOURCES
+    set(DECKLINK_SOURCES
             ${CMAKE_CURRENT_BINARY_DIR}/DeckLinkAPI_i.c
             ${CMAKE_CURRENT_BINARY_DIR}/DeckLinkAPI.h)
 
@@ -64,13 +64,16 @@ if (WIN32)
 
     set_source_files_properties(${MIDL_OUTPUT} PROPERTIES GENERATED TRUE)
 
-    add_custom_target(DeckLinkMIDL DEPENDS ${MIDL_OUTPUT})
+    add_custom_target(DeckLinkSDK DEPENDS ${MIDL_OUTPUT})
+elseif(LINUX)
+    set(DECKLINK_SDK_INCLUDE_DIR ${DECKLINK_SDK_DIR}/Linux/include)
+    set(DECKLINK_SOURCES ${DECKLINK_SDK_INCLUDE_DIR}/DeckLinkAPIDispatch.cpp)
+    add_library(DeckLinkSDK INTERFACE)
+    target_include_directories(DeckLinkSDK INTERFACE ${DECKLINK_SDK_INCLUDE_DIR})
 endif()
 
 list(APPEND DEPENDENCIES ${NOS_SUBSYSTEM_SDK_TARGET} ${NOS_SYS_MEDIAIO_TARGET_0_1} generated_nosDeckLinkDevice generated_nosDeckLinkDevice_dep_nosSysMediaIO)
-if (WIN32)
-    list(APPEND DEPENDENCIES DeckLinkMIDL)
-endif()
+list(APPEND DEPENDENCIES DeckLinkSDK)
 list(APPEND INCLUDE_FOLDERS
      ${EXTERNAL_DIR}
      ${CMAKE_CURRENT_SOURCE_DIR}/Source
@@ -79,7 +82,7 @@ list(APPEND INCLUDE_FOLDERS
 
 nos_add_subsystem("nosDeckLinkDevice" "${DEPENDENCIES}" "${INCLUDE_FOLDERS}")
 
-target_sources(nosDeckLinkDevice PRIVATE ${PLATFORM_SOURCES})
+target_sources(nosDeckLinkDevice PRIVATE ${DECKLINK_SOURCES})
 
 # Project generation
 nos_group_targets("nosDeckLinkDevice" "NOS Subsystems")

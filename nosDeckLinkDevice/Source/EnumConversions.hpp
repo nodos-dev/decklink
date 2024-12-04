@@ -426,7 +426,13 @@ constexpr nosMediaIOFrameRate GetFrameRateFromDisplayMode(BMDDisplayMode display
 	}
 }
 
-constexpr struct { nosMediaIOFrameGeometry FrameGeometry; nosMediaIOFrameRate FrameRate; } GetFrameGeometryAndRatePairFromDeckLinkDisplayMode(BMDDisplayMode displayMode)
+struct FrameGeometryAndRatePair
+{
+	nosMediaIOFrameGeometry FrameGeometry;
+	nosMediaIOFrameRate FrameRate;
+};
+
+constexpr FrameGeometryAndRatePair GetFrameGeometryAndRatePairFromDeckLinkDisplayMode(BMDDisplayMode displayMode)
 {
 	switch (displayMode)
 	{

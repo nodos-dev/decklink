@@ -12,18 +12,6 @@
 namespace nos::decklink
 {
 
-HRESULT GetDeckLinkIterator(IDeckLinkIterator **deckLinkIterator)
-{
-	HRESULT result = S_OK;
-
-	// Create an IDeckLinkIterator object to enumerate all DeckLink cards in the system
-	result = CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)deckLinkIterator);
-	if (FAILED(result))
-		nosEngine.LogE("A DeckLink iterator could not be created. The DeckLink drivers may not be installed.");
-
-	return result;
-}
-
 std::vector<std::unique_ptr<Device>> InitializeDevices()
 {
 	IDeckLinkIterator* deckLinkIterator = nullptr;
