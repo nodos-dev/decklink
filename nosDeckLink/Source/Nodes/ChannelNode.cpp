@@ -42,7 +42,7 @@ void FrameResultCallback(void* userData, nosDeckLinkFrameResult result, uint32_t
 	
 struct ChannelHandler
 {
-	class ChannelNode* Node;
+	NodeContext* Node;
 	bool ShouldOpen = true;
 	bool IsOpen = false;
 	bool IsStreamStarted = false;
@@ -82,7 +82,7 @@ struct ChannelHandler
 		return ChannelUpdateResult::Opened;
 	}
 
-	ChannelHandler(ChannelNode* node) : Node(node)
+	ChannelHandler(NodeContext* node) : Node(node)
 	{
 		UpdateChannelStatus();
 	}
@@ -167,6 +167,7 @@ struct ChannelHandler
 		if (res == NOS_RESULT_SUCCESS)
 		{
 			IsOpen = true;
+			Node->SetPinOrphanState(OutChannelPinId, fb::PinOrphanStateType::ACTIVE, nullptr);
 			ChannelId id(DeviceIndex, Channel, Direction);
 			nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(id));
 			nosEngine.SendPathRestart(OutChannelPinId);
@@ -202,12 +203,10 @@ struct ChannelHandler
 		nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(ChannelId(-1, 0, false)));
 		nosEngine.SetPinValue(OutResolutionPinId, nos::Buffer::From(nosVec2u{ 0, 0 }));
 		nosEngine.SendPathRestart(OutChannelPinId);
-		auto [type, text] = GetChannelStatusString();
-		SetStatus(StatusType::Channel, type, text);
-		UpdateStatus();
+		UpdateChannelStatus();
 	}
 
-	std::pair<fb::NodeStatusMessageType, std::string> GetChannelStatusString()
+	void UpdateChannelStatus()
 	{
 		std::string channelString = nosDeckLink->GetChannelName(Channel);
 		channelString += " ";
@@ -218,25 +217,34 @@ struct ChannelHandler
 		}
 		if (FrameRate != NOS_MEDIAIO_FRAME_RATE_INVALID)
 			channelString += nosMediaIO->GetFrameRateName(FrameRate);
+		fb::NodeStatusMessageType type;
+		std::string statusText;
 		if (ShouldOpen && IsOpen)
 		{
-			return {fb::NodeStatusMessageType::INFO, channelString};
-		}
-		if (ShouldOpen && !IsOpen && CanOpen())
+			type = fb::NodeStatusMessageType::INFO;
+			statusText = channelString;
+			Node->SetPinOrphanState(OutChannelPinId, fb::PinOrphanStateType::ACTIVE);
+		} else
 		{
-			return {fb::NodeStatusMessageType::FAILURE, "Failed to open: " + channelString};
+			if (ShouldOpen && !IsOpen && CanOpen())
+			{
+				type = fb::NodeStatusMessageType::FAILURE;
+				statusText = "Failed to open: " + channelString;
+				
+			}
+			else if (!ShouldOpen)
+			{
+				type = fb::NodeStatusMessageType::WARNING;
+				statusText = "Channel closed";
+			}
+			else
+			{
+				type = fb::NodeStatusMessageType::WARNING;
+				statusText = "Idle";
+			}
+			Node->SetPinOrphanState(OutChannelPinId, fb::PinOrphanStateType::ORPHAN, statusText.c_str());
 		}
-		if (!ShouldOpen)
-		{
-			return {fb::NodeStatusMessageType::WARNING, "Channel closed"};
-		}
-		return { fb::NodeStatusMessageType::WARNING, "Idle" };
-	}
-
-	void UpdateChannelStatus()
-	{
-		auto [type, text] = GetChannelStatusString();
-		SetStatus(StatusType::Channel, type, text);
+		SetStatus(StatusType::Channel, type, statusText);
 		UpdateStatus();
 	}
 
