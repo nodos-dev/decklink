@@ -27,8 +27,9 @@ std::vector<std::unique_ptr<Device>> InitializeDevices()
 #endif
 
 	result = GetDeckLinkIterator(&deckLinkIterator);
-	if (FAILED(result))
+	if (FAILED(result) || deckLinkIterator == nullptr)
 	{
+		nosEngine.LogE("DeckLinkDevice: Could not obtain DeckLink iterator");
 		return {};
 	}
 
