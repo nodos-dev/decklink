@@ -179,7 +179,9 @@
             "usage": "TRANSFER_SRC TRANSFER_DST SAMPLED STORAGE RENDER_TARGET"
           },
           "advanced_property": true,
-          "meta_data_map": [],
+          "meta_data_map": [
+            { "key": "OrphanPortal", "value": "/Channel.ChannelId" }
+          ],
           "contents_type": "PortalPin",
           "contents": { "source_id": "da8a6f3b-a685-4ef9-bf63-f11be65edba4" },
           "description": ""
