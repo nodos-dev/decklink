@@ -172,6 +172,9 @@ struct ChannelHandler
 			nosEngine.SetPinValue(OutChannelPinId, nos::Buffer::From(id));
 			nosEngine.SendPathRestart(OutChannelPinId);
 			FrameResultCallbackId = nosDeckLink->RegisterFrameResultCallback(DeviceIndex, Channel, &FrameResultCallback, this);
+			DeckLinkThread = {};
+			ClearStatus(StatusType::DropCount);
+			UpdateStatus();
 		}
 		UpdateChannelStatusAndOutPins();
 		return res == NOS_RESULT_SUCCESS;
@@ -188,8 +191,8 @@ struct ChannelHandler
 		if (IsOpen)
 		{
 			nosDeckLink->StopStream(DeviceIndex, Channel);
-			ClearStatus(StatusType::DropCount);
-			DeckLinkThread = {};
+			DeckLinkThread.DropDetected = false;
+			DeckLinkThread.FramesSinceLastDrop = 0;
 		}
 	}
 
@@ -298,7 +301,6 @@ void FrameResultCallback(void* userData, nosDeckLinkFrameResult result, uint32_t
 {
 	static_cast<ChannelHandler*>(userData)->OnFrameEnd_DeckLinkThread(result, processedFrameNumber);
 }
-
 
 class ChannelNode : public nos::NodeContext
 {
