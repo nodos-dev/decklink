@@ -57,14 +57,20 @@ public:
 
 	void ClearSubDevices();
 
+	int32_t AddDeviceInvalidatedCallback(nosDeckLinkDeviceInvalidatedCallback callback, void* userData);
+	void RemoveDeviceInvalidatedCallback(int32_t callbackId);
+
 	uint32_t Index = -1;
 	int64_t GroupId = -1;
 	std::string ModelName;
 protected:
-
 	std::vector<std::unique_ptr<SubDevice>> SubDevices;
 	std::unordered_map<nosMediaIODirection, std::unordered_map<nosDeckLinkChannel, SubDevice*>> Channel2SubDevice;
 	std::unordered_map<nosDeckLinkChannel, std::pair<SubDevice*, nosMediaIODirection>> OpenChannels;
+
+	int32_t NextDeviceInvalidatedCallbackId = 0;
+	std::unordered_map<int32_t, std::pair<nosDeckLinkDeviceInvalidatedCallback, void*>> DeviceInvalidatedCallbacks;
+	std::unique_ptr<std::mutex> DeviceInvalidatedCallbacksMutex;
 };
 	
 }

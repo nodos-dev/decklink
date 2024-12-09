@@ -30,49 +30,49 @@ public:
 		// // Check for video field changes
 		if (notificationEvents & bmdVideoInputFieldDominanceChanged)
 		{
-		    BMDFieldDominance fieldDominance = newDisplayMode->GetFieldDominance();
+			BMDFieldDominance fieldDominance = newDisplayMode->GetFieldDominance();
 		}
 		
 		// Check if the pixel format has changed
 		if (notificationEvents & bmdVideoInputColorspaceChanged)
 		{
-		    if (detectedSignalFlags & bmdDetectedVideoInputYCbCr422)
-		    {
-		        if (detectedSignalFlags & bmdDetectedVideoInput8BitDepth)
-		            pixelFormat = bmdFormat8BitYUV;
-		        else if (detectedSignalFlags & bmdDetectedVideoInput10BitDepth)
-		            pixelFormat = bmdFormat10BitYUV;
-		        else
-		            return E_FAIL;
-		    }
-		    else if (detectedSignalFlags & bmdDetectedVideoInputRGB444)
-		    {
-		        if (detectedSignalFlags & bmdDetectedVideoInput8BitDepth)
-		            pixelFormat = bmdFormat8BitARGB;
-		        else if (detectedSignalFlags & bmdDetectedVideoInput10BitDepth)
-		            pixelFormat = bmdFormat10BitRGB;
-		        else if (detectedSignalFlags & bmdDetectedVideoInput12BitDepth)
-		            pixelFormat = bmdFormat12BitRGB;
-		        else
-		        {
-		            return E_FAIL;
-		        }
-		    }
+			if (detectedSignalFlags & bmdDetectedVideoInputYCbCr422)
+			{
+				if (detectedSignalFlags & bmdDetectedVideoInput8BitDepth)
+					pixelFormat = bmdFormat8BitYUV;
+				else if (detectedSignalFlags & bmdDetectedVideoInput10BitDepth)
+					pixelFormat = bmdFormat10BitYUV;
+				else
+					return E_FAIL;
+			}
+			else if (detectedSignalFlags & bmdDetectedVideoInputRGB444)
+			{
+				if (detectedSignalFlags & bmdDetectedVideoInput8BitDepth)
+					pixelFormat = bmdFormat8BitARGB;
+				else if (detectedSignalFlags & bmdDetectedVideoInput10BitDepth)
+					pixelFormat = bmdFormat10BitRGB;
+				else if (detectedSignalFlags & bmdDetectedVideoInput12BitDepth)
+					pixelFormat = bmdFormat12BitRGB;
+				else
+				{
+					return E_FAIL;
+				}
+			}
 		}
 		
 		// Check if the video mode has changed
 		if (notificationEvents & bmdVideoInputDisplayModeChanged)
 		{
-		    // Obtain the name of the video mode
+			// Obtain the name of the video mode
 			dlstring_t displayModeString;
-		    if (newDisplayMode->GetName(&displayModeString) == S_OK)
-		    {
-		        std::string modeName = DlToStdString(displayModeString);
-		        if (detectedSignalFlags & bmdDetectedVideoInputDualStream3D)
-		            videoInputFlags |= bmdVideoInputDualStream3D;
-		        // Release the video mode name string
-		        DeleteString(displayModeString);
-		    }
+			if (newDisplayMode->GetName(&displayModeString) == S_OK)
+			{
+				std::string modeName = DlToStdString(displayModeString);
+				if (detectedSignalFlags & bmdDetectedVideoInputDualStream3D)
+					videoInputFlags |= bmdVideoInputDualStream3D;
+				// Release the video mode name string
+				DeleteString(displayModeString);
+			}
 		}
 		
 		if (notificationEvents & (bmdVideoInputDisplayModeChanged | bmdVideoInputColorspaceChanged))
@@ -257,7 +257,7 @@ void InputHandler::OnInputVideoFormatChanged_DeckLinkThread(BMDDisplayMode newDi
 {
 	// Pause video capture
 	Interface->PauseStreams();
-            
+			
 	// Enable video input with the properties of the new video stream
 	Interface->EnableVideoInput(newDisplayMode, pixelFormat, bmdVideoInputEnableFormatDetection);
 

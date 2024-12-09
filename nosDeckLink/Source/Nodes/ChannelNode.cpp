@@ -39,6 +39,7 @@ enum class ChannelUpdateResult
 
 void InputVideoFormatChanged(void* userData, nosMediaIOFrameGeometry frameGeometry, nosMediaIOFrameRate frameRate, nosMediaIOPixelFormat pixelFormat);
 void FrameResultCallback(void* userData, nosDeckLinkFrameResult result, uint32_t processedFrameNumber);
+void DeviceInvalidated(void* userData);
 	
 struct ChannelHandler
 {
@@ -46,6 +47,7 @@ struct ChannelHandler
 	bool ShouldOpen = true;
 	bool IsOpen = false;
 	bool IsStreamStarted = false;
+	nosUUID IsOpenPinId;
 	nosUUID OutChannelPinId;
 	nosUUID OutResolutionPinId;
 	nosUUID OutPixelFormatPinId;
@@ -60,6 +62,7 @@ struct ChannelHandler
 	nosMediaIOPixelFormat PixelFormat = NOS_MEDIAIO_PIXEL_FORMAT_INVALID;
 	int32_t VideoInputChangeCallbackId = -1;
 	int32_t FrameResultCallbackId = -1;
+	int32_t DeviceInvalidatedCallbackId = -1;
 
 	struct
 	{
@@ -133,6 +136,11 @@ struct ChannelHandler
 		}
 	}
 
+	void DeviceInvalidated()
+	{
+		nosEngine.SetPinValue(IsOpenPinId, nos::Buffer::From(false));
+	}
+
 	bool CanOpen()
 	{
 		if (!ShouldOpen || DeviceIndex == -1 || Channel == NOS_DECKLINK_CHANNEL_INVALID)
@@ -163,6 +171,7 @@ struct ChannelHandler
 		{
 			VideoInputChangeCallbackId = nosDeckLink->RegisterInputVideoFormatChangeCallback(DeviceIndex, Channel, &InputVideoFormatChanged, this);
 		}
+		DeviceInvalidatedCallbackId = nosDeckLink->RegisterDeviceInvalidatedCallback(DeviceIndex, &decklink::DeviceInvalidated, this);
 		auto res = nosDeckLink->OpenChannel(DeviceIndex, &params);
 		if (res == NOS_RESULT_SUCCESS)
 		{
@@ -302,6 +311,11 @@ void FrameResultCallback(void* userData, nosDeckLinkFrameResult result, uint32_t
 	static_cast<ChannelHandler*>(userData)->OnFrameEnd_DeckLinkThread(result, processedFrameNumber);
 }
 
+void DeviceInvalidated(void* userData)
+{
+	static_cast<ChannelHandler*>(userData)->DeviceInvalidated();
+}
+
 class ChannelNode : public nos::NodeContext
 {
 public:
@@ -313,6 +327,7 @@ public:
 		SetPinVisualizer(NSN_FrameRate, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetFrameRateStringListName()});
 		SetPinVisualizer(NSN_PixelFormat, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetPixelFormatStringListName()});
 
+		Channel.IsOpenPinId = *GetPinId(NSN_IsOpen);
 		Channel.OutChannelPinId = *GetPinId(NSN_ChannelId);
 		Channel.OutResolutionPinId = *GetPinId(NSN_ChannelResolution);
 		Channel.OutPixelFormatPinId = *GetPinId(NSN_ChannelPixelFormat);

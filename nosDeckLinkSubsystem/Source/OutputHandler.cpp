@@ -205,10 +205,9 @@ void OutputHandler::DmaTransfer(void* buffer, size_t size)
 		}
 		output.EndAccess();
 	}
-	auto seconds = sw.Elapsed();
 	char watchLogBuf[128];
 	snprintf(watchLogBuf, sizeof(watchLogBuf), "DeckLink %d:%s DMAWrite", DeviceIndex, GetChannelName(Channel));
-	nosEngine.WatchLog(watchLogBuf, util::Stopwatch::ElapsedString(seconds).c_str());
+	nosEngine.WatchLog(watchLogBuf, sw.ElapsedString().c_str());
 	ScheduleNextFrame();
 }
 

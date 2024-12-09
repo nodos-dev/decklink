@@ -1,8 +1,6 @@
 // Copyright MediaZ Teknoloji A.S. All Rights Reserved.
 #include "DeviceManager.hpp"
 
-#include <Nodos/Modules.h>
-
 #include "Device.hpp"
 
 namespace nos::decklink
@@ -10,42 +8,89 @@ namespace nos::decklink
 
 DeviceManager::DeviceManager()
 {
-    Devices = InitializeDevices();
+	Devices = InitializeDevices();
+	for (auto& device : Devices)
+		DeviceMutexes[device->Index] = std::make_unique<std::shared_mutex>();
 	for (auto& device : Devices)
 	{
+		LockDevice(device->Index);
 		auto profileId = device->GetActiveProfile();
 		if (profileId && *profileId != bmdProfileFourSubDevicesHalfDuplex)
 		{
 			device->UpdateProfile(bmdProfileFourSubDevicesHalfDuplex);
 		}
+		UnlockDevice(device->Index);
 	}
 }
 
 DeviceManager::~DeviceManager()
 {
-    ClearDeviceList();
+	ClearDeviceList();
 }
 
 void DeviceManager::ClearDeviceList()
 {
-    Devices.clear();
+	for (auto it = Devices.begin(); it != Devices.end(); ++it)
+	{
+		auto index = it->get()->Index;
+		LockDevice(index, false);
+		it->reset();
+		UnlockDevice(index, false);
+	}
+	Devices.clear();
 }
 
 Device* DeviceManager::GetDevice(int64_t groupId)
 {
-    for (auto& device : Devices)
-    {
-        if (device->GroupId == groupId)
-            return device.get();
-    }
-    return nullptr;
+	for (auto& device : Devices)
+	{
+		if (device->GroupId == groupId)
+			return device.get();
+	}
+	return nullptr;
 }
 
 Device* DeviceManager::GetDevice(uint32_t deviceIndex)
 {
-    if (deviceIndex < Devices.size())
-        return Devices[deviceIndex].get();
-    return nullptr;
+	if (deviceIndex < Devices.size())
+		return Devices[deviceIndex].get();
+	return nullptr;
 }
 
+void DeviceManager::LockDevice(uint32_t deviceIndex, bool shared)
+{
+	auto it = DeviceMutexes.find(deviceIndex);
+	if (it == DeviceMutexes.end())
+		return;
+	if (shared)
+		it->second->lock_shared();
+	else
+		it->second->lock();
+}
+
+void DeviceManager::UnlockDevice(uint32_t deviceIndex, bool shared)
+{
+	auto it = DeviceMutexes.find(deviceIndex);
+	if (it == DeviceMutexes.end())
+		return;
+	if (shared)
+		it->second->unlock_shared();
+	else
+		it->second->unlock();
+}
+
+DeviceManager* DeviceManager::Instance()
+{
+	if (!SingleInstance)
+		SingleInstance = new DeviceManager;
+	return SingleInstance;
+}
+
+void DeviceManager::Destroy()
+{
+	delete SingleInstance;
+	SingleInstance = nullptr;
+}
+
+DeviceManager* DeviceManager::SingleInstance = nullptr;
 }

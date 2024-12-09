@@ -4,7 +4,6 @@
 
 #include "EnumConversions.hpp"
 
-
 NOS_INIT_WITH_MIN_REQUIRED_MINOR(0); // APITransition: Reminder that this should be reset after next major!
 
 #include <nosMediaIO/nosMediaIO.h>
@@ -23,11 +22,10 @@ NOS_END_IMPORT_DEPS()
 namespace nos::decklink
 {
 std::unordered_map<uint32_t, nosDeckLinkSubsystem*> GExportedSubsystemVersions;
-std::unique_ptr<DeviceManager> GInstance;
 
 nosResult NOSAPI_CALL UnloadSubsystem()
 {
-	GInstance.reset();
+	DeviceManager::Destroy();
 	return NOS_RESULT_SUCCESS;
 }
 
@@ -42,7 +40,7 @@ namespace internal
 {
 SubDevice* GetSubDevice(uint32_t deviceIndex, nosMediaIODirection dir, nosDeckLinkChannel channel)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -62,12 +60,13 @@ void NOSAPI_CALL GetDevices(size_t* outCount, nosDeckLinkDeviceDesc* outDeviceDe
 {
 	if (outCount == nullptr)
 		return;
-	auto& devices = GInstance->GetDevices();
+	auto& devices = DeviceManager::Instance()->GetDevices();
 	*outCount = devices.size();
 	if (outDeviceDescriptors == nullptr)
 		return;
 	for (size_t i = 0; i < *outCount; i++)
 	{
+		DeviceLock lock(i);
 		auto& device = devices[i];
 		outDeviceDescriptors[i].DeviceIndex = device->Index;
 		auto uniqueDisplayName = device->GetUniqueDisplayName();
@@ -79,7 +78,8 @@ void NOSAPI_CALL GetDevices(size_t* outCount, nosDeckLinkDeviceDesc* outDeviceDe
 
 nosResult NOSAPI_CALL GetAvailableChannels(uint32_t deviceIndex, nosMediaIODirection dir, nosDeckLinkChannelList* outChannels)
 {
-	auto device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (device == nullptr)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -109,7 +109,7 @@ nosDeckLinkChannel NOSAPI_CALL GetChannelByName(const char* channelName)
 
 nosResult NOSAPI_CALL GetDeviceByUniqueDisplayName(const char* uniqueDisplayName, uint32_t* outDeviceIndex)
 {
-	auto& devices = GInstance->GetDevices();
+	auto& devices = DeviceManager::Instance()->GetDevices();
 	for (size_t i = 0; i < devices.size(); i++)
 	{
 		auto& device = devices[i];
@@ -124,7 +124,8 @@ nosResult NOSAPI_CALL GetDeviceByUniqueDisplayName(const char* uniqueDisplayName
 	
 nosResult NOSAPI_CALL GetDeviceInfoByIndex(uint32_t deviceIndex, nosDeckLinkDeviceInfo* outInfo)
 {
-	auto& devices = GInstance->GetDevices();
+	DeviceLock lock(deviceIndex);
+	auto& devices = DeviceManager::Instance()->GetDevices();
 	if (deviceIndex >= devices.size())
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -147,6 +148,7 @@ nosResult NOSAPI_CALL GetSupportedOutputFrameGeometries(uint32_t deviceIndex, no
 		nosEngine.LogE("Invalid argument: outGeometries is nullptr");
 		return NOS_RESULT_INVALID_ARGUMENT;
 	}
+	DeviceLock lock(deviceIndex);
 	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
 	if (!subDevice)
 		return NOS_RESULT_NOT_FOUND;
@@ -165,6 +167,7 @@ nosResult NOSAPI_CALL GetSupportedOutputFrameRatesForGeometry(uint32_t deviceInd
 		nosEngine.LogE("Invalid argument: outFrameRates is nullptr");
 		return NOS_RESULT_INVALID_ARGUMENT;
 	}
+	DeviceLock lock(deviceIndex);
 	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
 	if (!subDevice)
 		return NOS_RESULT_NOT_FOUND;
@@ -186,6 +189,7 @@ nosResult NOSAPI_CALL GetSupportedOutputPixelFormats(uint32_t deviceIndex, nosDe
 		nosEngine.LogE("Invalid argument: outList is nullptr");
 		return NOS_RESULT_INVALID_ARGUMENT;
 	}
+	DeviceLock lock(deviceIndex);
 	auto* subDevice = internal::GetSubDevice(deviceIndex, NOS_MEDIAIO_DIRECTION_OUTPUT, channel);
 	if (!subDevice)
 		return NOS_RESULT_NOT_FOUND;
@@ -200,7 +204,8 @@ nosResult NOSAPI_CALL GetSupportedOutputPixelFormats(uint32_t deviceIndex, nosDe
 
 nosResult NOSAPI_CALL OpenChannel(uint32_t deviceIndex, nosDeckLinkOpenChannelParams* params)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -227,7 +232,8 @@ nosResult NOSAPI_CALL OpenChannel(uint32_t deviceIndex, nosDeckLinkOpenChannelPa
 
 nosResult NOSAPI_CALL CloseChannel(uint32_t deviceIndex, nosDeckLinkChannel channel)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -243,7 +249,8 @@ nosResult NOSAPI_CALL CloseChannel(uint32_t deviceIndex, nosDeckLinkChannel chan
 
 nosResult NOSAPI_CALL GetCurrentDeltaSecondsOfChannel(uint32_t deviceIndex, nosDeckLinkChannel channel, nosVec2u* outDeltaSeconds)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -261,7 +268,8 @@ nosResult NOSAPI_CALL GetCurrentDeltaSecondsOfChannel(uint32_t deviceIndex, nosD
 
 nosResult NOSAPI_CALL WaitFrame(uint32_t deviceIndex, nosDeckLinkChannel channel, uint32_t timeoutMs)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -274,7 +282,8 @@ nosResult NOSAPI_CALL WaitFrame(uint32_t deviceIndex, nosDeckLinkChannel channel
 
 nosResult NOSAPI_CALL DMATransfer(uint32_t deviceIndex, nosDeckLinkChannel channel, void* data, size_t size)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -287,7 +296,8 @@ nosResult NOSAPI_CALL DMATransfer(uint32_t deviceIndex, nosDeckLinkChannel chann
 
 int32_t NOSAPI_CALL RegisterInputVideoFormatChangeCallback(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkInputVideoFormatChangeCallback callback, void* userData)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -304,7 +314,8 @@ int32_t NOSAPI_CALL RegisterInputVideoFormatChangeCallback(uint32_t deviceIndex,
 
 nosResult NOSAPI_CALL UnregisterInputVideoFormatChangeCallback(uint32_t deviceIndex, nosDeckLinkChannel channel, int32_t callbackId)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -322,7 +333,8 @@ nosResult NOSAPI_CALL UnregisterInputVideoFormatChangeCallback(uint32_t deviceIn
 
 nosResult NOSAPI_CALL StartStream(uint32_t deviceIndex, nosDeckLinkChannel channel)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -333,7 +345,8 @@ nosResult NOSAPI_CALL StartStream(uint32_t deviceIndex, nosDeckLinkChannel chann
 
 nosResult NOSAPI_CALL StopStream(uint32_t deviceIndex, nosDeckLinkChannel channel)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -344,7 +357,8 @@ nosResult NOSAPI_CALL StopStream(uint32_t deviceIndex, nosDeckLinkChannel channe
 
 int32_t NOSAPI_CALL RegisterFrameResultCallback(uint32_t deviceIndex, nosDeckLinkChannel channel, nosDeckLinkFrameResultCallback callback, void* userData)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -361,7 +375,8 @@ int32_t NOSAPI_CALL RegisterFrameResultCallback(uint32_t deviceIndex, nosDeckLin
 
 nosResult NOSAPI_CALL UnregisterFrameResultCallback(uint32_t deviceIndex, nosDeckLinkChannel channel, int32_t callbackId)
 {
-	auto* device = GInstance->GetDevice(deviceIndex);
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
 	if (!device)
 	{
 		nosEngine.LogE("No such device with index %d", deviceIndex);
@@ -375,6 +390,31 @@ nosResult NOSAPI_CALL UnregisterFrameResultCallback(uint32_t deviceIndex, nosDec
 	}
 	subDevice->RemoveFrameResultCallback(dir, callbackId);
 	return NOS_RESULT_SUCCESS;	
+}
+
+int32_t NOSAPI_CALL RegisterDeviceInvalidatedCallback(uint32_t deviceIndex, nosDeckLinkDeviceInvalidatedCallback callback, void* userData)
+{
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	return device->AddDeviceInvalidatedCallback(callback, userData);
+}
+
+nosResult NOSAPI_CALL UnregisterDeviceInvalidatedCallback(uint32_t deviceIndex, int32_t callbackId)
+{
+	DeviceLock lock(deviceIndex);
+	auto* device = DeviceManager::Instance()->GetDevice(deviceIndex);
+	if (!device)
+	{
+		nosEngine.LogE("No such device with index %d", deviceIndex);
+		return NOS_RESULT_NOT_FOUND;
+	}
+	device->RemoveDeviceInvalidatedCallback(callbackId);
+	return NOS_RESULT_SUCCESS;
 }
 
 nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
@@ -406,6 +446,8 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->StopStream = StopStream;
 	subsystem->RegisterFrameResultCallback = RegisterFrameResultCallback;
 	subsystem->UnregisterFrameResultCallback = UnregisterFrameResultCallback;
+	subsystem->RegisterDeviceInvalidatedCallback = RegisterDeviceInvalidatedCallback;
+	subsystem->UnregisterDeviceInvalidatedCallback = UnregisterDeviceInvalidatedCallback;
 	*outSubsystemContext = subsystem;
 	GExportedSubsystemVersions[minorVersion] = subsystem;
 	return NOS_RESULT_SUCCESS;
@@ -413,7 +455,7 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 
 nosResult NOSAPI_CALL Initialize()
 {
-	GInstance = std::make_unique<DeviceManager>();
+	DeviceManager::Instance();
 	return NOS_RESULT_SUCCESS;
 }
 

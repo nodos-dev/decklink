@@ -80,6 +80,7 @@ typedef enum nosDeckLinkFrameResult
 
 typedef void (NOSAPI_CALL* nosDeckLinkInputVideoFormatChangeCallback)(void* userData, nosMediaIOFrameGeometry geometry, nosMediaIOFrameRate frameRate, nosMediaIOPixelFormat pixelFormat);
 typedef void (NOSAPI_CALL* nosDeckLinkFrameResultCallback)(void* userData, nosDeckLinkFrameResult result, uint32_t processedFrameNumber);
+typedef void (NOSAPI_CALL* nosDeckLinkDeviceInvalidatedCallback)(void* userData);
 
 typedef struct nosDeckLinkSubsystem {
 	void				(NOSAPI_CALL* GetDevices)(size_t *inoutCount, nosDeckLinkDeviceDesc* outDeviceDescriptors);
@@ -106,6 +107,9 @@ typedef struct nosDeckLinkSubsystem {
 	nosResult (NOSAPI_CALL* DMATransfer)(uint32_t deviceIndex, nosDeckLinkChannel channel, void* data, size_t size);
 	nosResult (NOSAPI_CALL* StartStream)(uint32_t deviceIndex, nosDeckLinkChannel channel);
 	nosResult (NOSAPI_CALL* StopStream)(uint32_t deviceIndex, nosDeckLinkChannel channel);
+
+	int32_t   (NOSAPI_CALL* RegisterDeviceInvalidatedCallback)(uint32_t deviceIndex, nosDeckLinkDeviceInvalidatedCallback callback, void* userData);
+	nosResult (NOSAPI_CALL* UnregisterDeviceInvalidatedCallback)(uint32_t deviceIndex, int32_t callbackId);
 } nosDeckLinkSubsystem;
 
 #pragma region Helper Declarations & Macros

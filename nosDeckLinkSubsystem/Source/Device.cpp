@@ -6,6 +6,7 @@
 #include <nosUtil/Stopwatch.hpp>
 
 #include "ChannelMapping.inl"
+#include "DeviceManager.hpp"
 #include "EnumConversions.hpp"
 #include "SubDevice.hpp"
 
@@ -66,28 +67,32 @@ std::vector<std::unique_ptr<Device>> InitializeDevices()
 class ProfileChangeCallback : public Object<IDeckLinkProfileCallback>
 {
 public:
-	ProfileChangeCallback(Device* deckLinkDevice) :
-		Device(deckLinkDevice)
+	ProfileChangeCallback(uint32_t deviceIndex, int64_t deviceGroupId) :
+		DeviceIndex(deviceIndex), DeviceGroupId(deviceGroupId)
 	{
 	}
 
 	HRESULT	STDMETHODCALLTYPE ProfileChanging(IDeckLinkProfile* newProfile, dlbool_t streamsWillBeForcedToStop) override
 	{
-		Device->ClearSubDevices();
+		DeviceLock lock(DeviceIndex, false);
+		if (auto device = DeviceManager::Instance()->GetDevice(DeviceIndex))
+			device->ClearSubDevices();
 		return S_OK;
 	}
 	HRESULT	STDMETHODCALLTYPE ProfileActivated(IDeckLinkProfile* newProfile) override
 	{
-		auto groupId = Device->GroupId;
-		Device->Reinit(groupId);
+		DeviceLock lock(DeviceIndex, false);
+		if (auto device = DeviceManager::Instance()->GetDevice(DeviceIndex))
+			device->Reinit(DeviceGroupId);
 		return S_OK;
 	}
 
-	Device* Device;
+	uint32_t DeviceIndex;
+	int64_t DeviceGroupId;
 };
 
 Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevices)
-	: Index(index), SubDevices(std::move(subDevices))
+	: Index(index), SubDevices(std::move(subDevices)), DeviceInvalidatedCallbacksMutex(new std::mutex)
 {
 	if (SubDevices.empty())
 		nosEngine.LogE("No sub-device provided for device index: %d", index);
@@ -129,12 +134,12 @@ Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevi
 		}
 	}
 
-	auto profileChangeCallback = new ProfileChangeCallback(this);
-	if (profileChangeCallback == nullptr)
+	auto onProfileChange = new ProfileChangeCallback(Index, GroupId);
+	if (onProfileChange == nullptr)
 		nosEngine.LogE("Could not create profile change callback");
 	else
-		GetProfileManager()->SetCallback(profileChangeCallback);
-	Release(profileChangeCallback);
+		GetProfileManager()->SetCallback(onProfileChange);
+	Release(onProfileChange);
 }
 
 void Device::Reinit(uint32_t groupId)
@@ -267,40 +272,42 @@ std::optional<BMDProfileID> Device::GetActiveProfile() const
 	return std::nullopt;
 }
 
-void Device::UpdateProfile(BMDProfileID profileId)
+void Device::UpdateProfile(BMDProfileID newProfileId)
 {
 	if (SubDevices.empty())
 		return;
 	auto& subDevice = SubDevices[0];
-	IDeckLinkProfileIterator* profileIterator = nullptr;
-	auto res = subDevice->ProfileManager->GetProfiles(&profileIterator);
-	if (res != S_OK || !profileIterator)
+	IDeckLinkProfileIterator* profileIter = nullptr;
+	auto res = subDevice->ProfileManager->GetProfiles(&profileIter);
+	if (res != S_OK || !profileIter)
 	{
 		nosEngine.LogE("DeckLinkDevice: Failed to get profile iterator for device: %s", ModelName.c_str());
 		return;
 	}
 	IDeckLinkProfile* profile = nullptr;
-	while (profileIterator->Next(&profile) == S_OK)
+	while (profileIter->Next(&profile) == S_OK)
 	{
-		IDeckLinkProfileAttributes* profileAttributes = nullptr;
-		if (profile->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&profileAttributes) == S_OK)
+		bool exit = false;
+		IDeckLinkProfileAttributes* profileAttr = nullptr;
+		if (profile->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&profileAttr) == S_OK)
 		{
 			int64_t profileId{};
-			if (profileAttributes->GetInt(BMDDeckLinkProfileID, &profileId) == S_OK)
+			if (profileAttr->GetInt(BMDDeckLinkProfileID, &profileId) == S_OK)
 			{
-				if (profileId == profileId)
+				if (profileId == newProfileId)
 				{
+					exit = true;
 					if (profile->SetActive() != S_OK)
 						nosEngine.LogE("DeckLinkDevice: Failed to set profile for device: %s", ModelName.c_str());
-				Release(profileAttributes);
-				Release(profileIterator);
+				}
 			}
-			Release(profileAttributes);
+			Release(profileAttr);
 		}
 		Release(profile);
+		if (exit)
+			break;
 	}
-	Release(profileIterator);
-}
+	Release(profileIter);
 }
 
 bool Device::OpenOutput(nosDeckLinkChannel channel, BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
@@ -353,7 +360,7 @@ std::optional<nosVec2u> Device::GetCurrentDeltaSecondsOfChannel(nosDeckLinkChann
 	auto [subDevice, mode] = it->second;
 	return subDevice->GetDeltaSeconds(mode);
 }
-	
+
 bool Device::WaitFrame(nosDeckLinkChannel channel, std::chrono::milliseconds timeout)
 {
 	auto it = OpenChannels.find(channel);
@@ -421,6 +428,29 @@ bool Device::StopStream(nosDeckLinkChannel channel)
 
 void Device::ClearSubDevices()
 {
+	Channel2SubDevice.clear();
+	OpenChannels.clear();
 	SubDevices.clear();
+	{
+		std::unique_lock lock(*DeviceInvalidatedCallbacksMutex);
+		for (auto& [callbackId, pair] : DeviceInvalidatedCallbacks)
+		{
+			auto& [callback, userData] = pair;
+			callback(userData);
+		}
+	}
+}
+
+int32_t Device::AddDeviceInvalidatedCallback(nosDeckLinkDeviceInvalidatedCallback callback, void* userData)
+{
+	std::unique_lock lock(*DeviceInvalidatedCallbacksMutex);
+	DeviceInvalidatedCallbacks[NextDeviceInvalidatedCallbackId] = { callback, userData };
+	return NextDeviceInvalidatedCallbackId++;
+}
+
+void Device::RemoveDeviceInvalidatedCallback(int32_t callbackId)
+{
+	std::unique_lock lock(*DeviceInvalidatedCallbacksMutex);
+	DeviceInvalidatedCallbacks.erase(callbackId);
 }
 }
