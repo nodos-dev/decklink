@@ -96,6 +96,7 @@ private:
 
 InputHandler::~InputHandler()
 {
+	CloseStream();
 	Release(Interface);
 }
 

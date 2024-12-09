@@ -55,8 +55,8 @@ public:
 	constexpr IOHandlerBaseI& GetIO(nosMediaIODirection dir);
 
 	IDeckLinkProfileManager* ProfileManager = nullptr;
+	IDeckLink* DLDevice = nullptr;
 protected:
-	IDeckLink* Device = nullptr;
 	IDeckLinkProfileAttributes* ProfileAttributes = nullptr;
 
 	OutputHandler Output;

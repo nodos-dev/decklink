@@ -144,7 +144,11 @@ Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevi
 
 void Device::Reinit(uint32_t groupId)
 {
+	IDeckLink* dlDevice = nullptr;
+	if (auto mainSubDevice = GetSubDevice(0))
+		dlDevice = mainSubDevice->DLDevice;
 	ClearSubDevices();
+	Release(dlDevice);
 	auto devices = InitializeDevices();
 	for (auto& device : devices)
 	{

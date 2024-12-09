@@ -11,16 +11,6 @@ DeviceManager::DeviceManager()
 	Devices = InitializeDevices();
 	for (auto& device : Devices)
 		DeviceMutexes[device->Index] = std::make_unique<std::shared_mutex>();
-	for (auto& device : Devices)
-	{
-		LockDevice(device->Index);
-		auto profileId = device->GetActiveProfile();
-		if (profileId && *profileId != bmdProfileFourSubDevicesHalfDuplex)
-		{
-			device->UpdateProfile(bmdProfileFourSubDevicesHalfDuplex);
-		}
-		UnlockDevice(device->Index);
-	}
 }
 
 DeviceManager::~DeviceManager()
@@ -32,9 +22,15 @@ void DeviceManager::ClearDeviceList()
 {
 	for (auto it = Devices.begin(); it != Devices.end(); ++it)
 	{
+		auto device = it->get();
+		IDeckLink* dlDevice = nullptr;
+		if (auto mainSubDevice = device->GetSubDevice(0))
+			dlDevice = mainSubDevice->DLDevice;
 		auto index = it->get()->Index;
 		LockDevice(index, false);
 		it->reset();
+		if (dlDevice)
+			Release(dlDevice);
 		UnlockDevice(index, false);
 	}
 	Devices.clear();

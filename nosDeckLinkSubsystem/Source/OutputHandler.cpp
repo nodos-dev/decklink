@@ -39,14 +39,14 @@ HRESULT	OutputCallback::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFr
 
 HRESULT	OutputCallback::ScheduledPlaybackHasStopped(void)
 {
+	Output->ScheduledPlaybackHasStopped_DeckLinkThread();
 	return S_OK;
 }
 
 OutputHandler::~OutputHandler()
 {
+	CloseStream();
 	Release(Interface);
-	for (auto& frame : VideoFrames)
-		Release(frame);
 }
 
 bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
@@ -104,7 +104,10 @@ bool OutputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 		Close();
 		return false;
 	}
-
+	{
+		std::unique_lock lock(PlaybackStoppedMutex);
+		Closed = false;
+	}
 	return true;
 }
 
@@ -151,6 +154,11 @@ bool OutputHandler::Close()
 			Release(frame);
 		WriteQueue.clear();
 	}
+	{
+		std::unique_lock lock(PlaybackStoppedMutex);
+		PlaybackStoppedCond.wait(lock, [this]{ return Closed; });
+	}
+	Interface->SetScheduledFrameCompletionCallback(nullptr);
 	return true;
 }
 
@@ -213,6 +221,8 @@ void OutputHandler::DmaTransfer(void* buffer, size_t size)
 
 void OutputHandler::ScheduleNextFrame()
 {
+	if (!IsCurrentlyRunning())
+		return;
 	IDeckLinkVideoFrame* frame;
 	{
 		std::unique_lock lock(VideoFramesMutex);
@@ -260,5 +270,14 @@ void OutputHandler::ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* 
 		break;
 	}
 	OnFrameEnd(frameResult);
+}
+
+void OutputHandler::ScheduledPlaybackHasStopped_DeckLinkThread()
+{
+	{
+		std::unique_lock lock(PlaybackStoppedMutex);
+		Closed = true;
+	}
+	PlaybackStoppedCond.notify_all();
 }
 }

@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <shared_mutex>
+#include <Nodos/Modules.h>
 
 namespace nos::decklink
 {

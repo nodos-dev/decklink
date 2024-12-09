@@ -22,6 +22,7 @@ struct OutputHandler : IOHandlerBase<IDeckLinkOutput>
 	
 	void ScheduleNextFrame();
 	void ScheduledFrameCompleted_DeckLinkThread(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
+	void ScheduledPlaybackHasStopped_DeckLinkThread();
 protected:
 	bool Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat) override;
 	bool Start() override;
@@ -29,5 +30,9 @@ protected:
 	bool Close() override;
 
 	int64_t FramePointFirstDisplayedLate = -1;
+
+	std::mutex PlaybackStoppedMutex;
+	std::condition_variable PlaybackStoppedCond;
+	bool Closed = true;
 };
 }

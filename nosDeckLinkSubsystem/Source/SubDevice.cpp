@@ -8,22 +8,22 @@ namespace nos::decklink
 {
 
 SubDevice::SubDevice(IDeckLink* deviceInterface)
-	: Device(deviceInterface)
+	: DLDevice(deviceInterface)
 {
 	dlstring_t modelName;
-	Device->GetModelName(&modelName);
+	DLDevice->GetModelName(&modelName);
 	ModelName = DlToStdString(modelName);
 	nosEngine.LogI("DeckLink Device created: %s", ModelName.c_str());
 	DeleteString(modelName);
 
-	auto res = Device->QueryInterface(IID_IDeckLinkInput, (void**)&Input.Interface);
+	auto res = DLDevice->QueryInterface(IID_IDeckLinkInput, (void**)&Input.Interface);
 	if (res != S_OK)
 		nosEngine.LogE("DeckLinkDevice: Failed to get input interface for device: %s", ModelName.c_str());
-	res = Device->QueryInterface(IID_IDeckLinkOutput, (void**)&Output.Interface);
+	res = DLDevice->QueryInterface(IID_IDeckLinkOutput, (void**)&Output.Interface);
 	if (res != S_OK)
 		nosEngine.LogE("DeckLinkDevice: Failed to get output interface for device: %s", ModelName.c_str());
 
-	res = Device->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&ProfileAttributes);
+	res = DLDevice->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&ProfileAttributes);
 	if (res != S_OK || !ProfileAttributes)
 	{
 		nosEngine.LogE("DeckLinkDevice: Failed to get profile attributes for device: %s", ModelName.c_str());
@@ -67,7 +67,7 @@ SubDevice::SubDevice(IDeckLink* deviceInterface)
 	if (res != S_OK)
 		nosEngine.LogE("DeckLinkDevice: Failed to get topological ID for device: %s", ModelName.c_str());
 
-	res = Device->QueryInterface(IID_IDeckLinkProfileManager, (void**)&ProfileManager);
+	res = DLDevice->QueryInterface(IID_IDeckLinkProfileManager, (void**)&ProfileManager);
 	if (res != S_OK || !ProfileManager)
 	{
 		nosEngine.LogE("DeckLinkDevice: Failed to get profile manager for device: %s", ModelName.c_str());
@@ -77,7 +77,6 @@ SubDevice::SubDevice(IDeckLink* deviceInterface)
 
 SubDevice::~SubDevice()
 {
-	Release(Device);
 	Release(ProfileAttributes);
 	Release(ProfileManager);
 }

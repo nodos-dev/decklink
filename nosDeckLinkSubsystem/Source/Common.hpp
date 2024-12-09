@@ -167,8 +167,8 @@ protected:
 	std::unordered_map<int32_t, std::pair<nosDeckLinkFrameResultCallback, void*>> FrameResultCallbacks;
 	int32_t NextFrameResultCallbackId = 0;
 private:
-	bool IsOpen = false;
-	bool IsStreamRunning = false;
+	std::atomic_bool IsOpen = false;
+	std::atomic_bool IsStreamRunning = false;
 public:
 	bool IsCurrentlyOpen() const
 	{
