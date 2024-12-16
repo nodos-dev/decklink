@@ -10,6 +10,14 @@
 namespace nos::decklink
 {
 
+inline const std::unordered_map<std::string, uint32_t>& GetSDIPortCounts()
+{
+	static std::unordered_map<std::string, uint32_t> map{};
+	if (!map.empty())
+		return map;
+	map["DeckLink 8K Pro"] = 4;
+	return map;
+}
 // Model Name -> Profile -> SubDeviceIndex -> Mode -> Connectors
 typedef std::unordered_map<std::string, std::unordered_map<BMDProfileID, std::unordered_map<int64_t, std::unordered_map<nosDeckLinkChannel, std::unordered_set<nosMediaIODirection>>>>> ConnectorMap;
 inline const ConnectorMap& GetChannelMap()

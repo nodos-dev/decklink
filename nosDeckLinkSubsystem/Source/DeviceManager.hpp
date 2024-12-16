@@ -28,6 +28,8 @@ public:
 	~DeviceManager();
 	sys::decklink::TSettings Settings;
 	void LoadDefaultSettings();
+	void LoadSettings(sys::decklink::Settings const& settings);
+	bool ValidatePortMappings();
 	void InitializeDeviceList();
 	std::optional<std::string> GetPortMappedChannelName(uint32_t deviceIndex, nosDeckLinkChannel channel);
 	nosDeckLinkChannel GetChannelFromPortMappedName(uint32_t deviceIndex, std::string_view portMappedName);

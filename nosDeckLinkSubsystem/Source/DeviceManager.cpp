@@ -1,6 +1,7 @@
 // Copyright MediaZ Teknoloji A.S. All Rights Reserved.
 #include "DeviceManager.hpp"
 
+#include "ChannelMapping.inl"
 #include "Device.hpp"
 
 namespace nos::decklink
@@ -21,6 +22,77 @@ DeviceManager::~DeviceManager()
 void DeviceManager::LoadDefaultSettings()
 {
 	Settings = {};
+}
+
+void DeviceManager::LoadSettings(sys::decklink::Settings const& settings)
+{
+	settings.UnPackTo(&Settings);
+	if (!ValidatePortMappings())
+	{
+		nosEngine.LogE("DeviceManager: Invalid port mappings in settings. Loading default settings.");
+		LoadDefaultSettings();
+	}
+}
+
+bool DeviceManager::ValidatePortMappings()
+{
+	bool success = true;
+	char errorMsg[256];
+	for (auto& portMappingSetting : Settings.sdi_port_mappings)
+	{
+		auto& modelName = portMappingSetting->model_name;
+		if (modelName.empty())
+		{
+			std::snprintf(errorMsg, sizeof(errorMsg), "Empty model name in port mappings.");
+			success = false;
+			break;
+		}
+		auto it = GetSDIPortCounts().find(modelName);
+		if (it == GetSDIPortCounts().end())
+		{
+			std::snprintf(errorMsg, sizeof(errorMsg), "Device model not supported: %s", modelName.c_str());
+			success = false;
+			break;
+		}
+		auto portCount = it->second;
+		auto& portMapping = portMappingSetting->sdi_port_mapping;
+		std::unordered_set<int> targetPorts, sourcePorts;
+		for (auto& entry : portMapping)
+		{
+			auto src = entry.source_port();
+			auto dst = entry.target_port();
+			if (src < 1 || src >= portCount || dst < 1 || dst >= portCount)
+			{
+				std::snprintf(errorMsg, sizeof(errorMsg), "Invalid port mapping for device %s: %d > %d", modelName.c_str(), src, dst);
+				success = false;
+				break;
+			}
+			if (targetPorts.find(dst) != targetPorts.end() || sourcePorts.find(src) != sourcePorts.end())
+			{
+				std::snprintf(errorMsg, sizeof(errorMsg), "Duplicate source or target port in port mapping for device %s: %d > %d", modelName.c_str(), src, dst);
+				success = false;
+				break;
+			}
+			targetPorts.insert(dst);
+			sourcePorts.insert(src);
+		}
+		if (!success)
+			break;
+	}
+	if (!success)
+	{
+		nosEngine.LogE("DeviceManager: %s", errorMsg);
+		char completeMsg[256];
+		std::snprintf(completeMsg, sizeof(completeMsg), "%s. Using default settings.", errorMsg);
+		nosModuleStatusMessage msg {
+			.ModuleId = nosEngine.Module->Id,
+			.UpdateType = NOS_MODULE_STATUS_MESSAGE_UPDATE_TYPE_APPEND,
+			.MessageType = NOS_MODULE_STATUS_MESSAGE_TYPE_ERROR,
+			.Message = completeMsg
+		};
+		nosEngine.SendModuleStatusMessageUpdate(&msg);
+	}
+	return success;
 }
 
 void DeviceManager::InitializeDeviceList()
