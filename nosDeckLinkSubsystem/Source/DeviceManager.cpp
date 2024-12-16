@@ -61,7 +61,7 @@ bool DeviceManager::ValidatePortMappings()
 		{
 			auto src = entry.source_port();
 			auto dst = entry.target_port();
-			if (src < 1 || src >= portCount || dst < 1 || dst >= portCount)
+			if (src < 1 || src > portCount || dst < 1 || dst > portCount)
 			{
 				std::snprintf(errorMsg, sizeof(errorMsg), "Invalid port mapping for device %s: %d > %d", modelName.c_str(), src, dst);
 				success = false;
