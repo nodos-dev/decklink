@@ -1,0 +1,15 @@
+namespace nos.sys.decklink;
+
+struct SDIPortMappingEntry {
+    source_port: int;
+    target_port: int;
+}
+
+table SDIPortMappingSetting {
+    model_name: string;
+    sdi_port_mapping: [SDIPortMappingEntry];
+}
+
+table Settings {
+    sdi_port_mappings: [SDIPortMappingSetting];
+}

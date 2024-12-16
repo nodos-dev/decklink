@@ -86,7 +86,7 @@ typedef struct nosDeckLinkSubsystem {
 	void				(NOSAPI_CALL* GetDevices)(size_t *inoutCount, nosDeckLinkDeviceDesc* outDeviceDescriptors);
 	nosResult			(NOSAPI_CALL* GetAvailableChannels)(uint32_t deviceIndex, nosMediaIODirection direction, nosDeckLinkChannelList* outChannels);
 	const char*			(NOSAPI_CALL* GetChannelName)(nosDeckLinkChannel channel);
-	nosDeckLinkChannel	(NOSAPI_CALL* GetChannelByName)(const char* channelName);
+	nosDeckLinkChannel	(NOSAPI_CALL* GetChannelFromName)(const char* channelName);
 	nosResult			(NOSAPI_CALL* GetDeviceByUniqueDisplayName)(const char* uniqueDisplayName, uint32_t* outDeviceIndex);
 	nosResult			(NOSAPI_CALL* GetDeviceInfoByIndex)(uint32_t deviceIndex, nosDeckLinkDeviceInfo* outInfo);
 
@@ -110,6 +110,14 @@ typedef struct nosDeckLinkSubsystem {
 
 	int32_t   (NOSAPI_CALL* RegisterDeviceInvalidatedCallback)(uint32_t deviceIndex, nosDeckLinkDeviceInvalidatedCallback callback, void* userData);
 	nosResult (NOSAPI_CALL* UnregisterDeviceInvalidatedCallback)(uint32_t deviceIndex, int32_t callbackId);
+
+	/// Port mapped channel name. If a custom port mapping is used (in Config/Settings.json), this function will return the mapped name.
+	/// Example:
+	///  - If SDI 1 is mapped to SDI 3:
+	///		- "Single Link 1" -> "Single Link 3"
+	///		- "Dual Link 1-2" -> "Dual Link 1-3"
+	nosResult		   (NOSAPI_CALL* GetPortMappedChannelName)(uint32_t deviceIndex, nosDeckLinkChannel channel, char* outName, size_t maxSize);
+	nosDeckLinkChannel (NOSAPI_CALL* GetChannelFromPortMappedName)(uint32_t deviceIndex, const char* portMappedChannelName);
 } nosDeckLinkSubsystem;
 
 #pragma region Helper Declarations & Macros
@@ -117,7 +125,7 @@ typedef struct nosDeckLinkSubsystem {
 // Make sure these are same with nossys file.
 #define NOS_DECKLINK_DEVICE_SUBSYSTEM_NAME "nos.sys.decklink"
 #define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MAJOR 0
-#define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MINOR 1
+#define NOS_DECKLINK_DEVICE_SUBSYSTEM_VERSION_MINOR 2
 
 extern struct nosModuleInfo nosDeckLinkSubsystemModuleInfo;
 extern nosDeckLinkSubsystem* nosDeckLink;

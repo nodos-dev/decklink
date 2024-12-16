@@ -18,7 +18,7 @@ nos_get_module("nos.sys.mediaio" "0.1" NOS_SYS_MEDIAIO_TARGET_0_1)
 nos_find_module_path("nos.sys.mediaio" "0.1" NOS_SYS_MEDIAIO_PATH)
 nos_generate_flatbuffers("${NOS_SYS_MEDIAIO_PATH}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Source/Generated" "cpp" "${NOS_SYS_MEDIAIO_PATH};${NOS_SDK_DIR}/types" generated_nosDeckLinkSubsystem_dep_nosSysMediaIO)
 
-nos_generate_flatbuffers("${CMAKE_CURRENT_SOURCE_DIR}/Config" "${CMAKE_CURRENT_SOURCE_DIR}/Include/nosDeckLinkSubsystem" "cpp" "${NOS_SDK_DIR}/types" generated_nosDeckLinkSubsystem)
+nos_generate_flatbuffers("${CMAKE_CURRENT_SOURCE_DIR}/Types" "${CMAKE_CURRENT_SOURCE_DIR}/Source" "cpp" "${NOS_SDK_DIR}/types" generated_nosDeckLinkSubsystem)
 
 # DeckLink SDK
 # ------------

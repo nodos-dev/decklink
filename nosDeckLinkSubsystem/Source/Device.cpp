@@ -13,7 +13,34 @@
 namespace nos::decklink
 {
 
-std::vector<std::unique_ptr<Device>> InitializeDevices()
+class ProfileChangeCallback : public Object<IDeckLinkProfileCallback>
+{
+public:
+	ProfileChangeCallback(uint32_t deviceIndex, int64_t deviceGroupId) :
+		DeviceIndex(deviceIndex), DeviceGroupId(deviceGroupId)
+	{
+	}
+
+	HRESULT	STDMETHODCALLTYPE ProfileChanging(IDeckLinkProfile* newProfile, dlbool_t streamsWillBeForcedToStop) override
+	{
+		DeviceLock lock(DeviceIndex, false);
+		if (auto device = DeviceManager::Instance()->GetDevice(DeviceIndex))
+			device->ClearSubDevices();
+		return S_OK;
+	}
+	HRESULT	STDMETHODCALLTYPE ProfileActivated(IDeckLinkProfile* newProfile) override
+	{
+		DeviceLock lock(DeviceIndex, false);
+		if (auto device = DeviceManager::Instance()->GetDevice(DeviceIndex))
+			device->Reinit(DeviceGroupId);
+		return S_OK;
+	}
+
+	uint32_t DeviceIndex;
+	int64_t DeviceGroupId;
+};
+
+std::vector<std::unique_ptr<class Device>> CreateDevices(std::optional<uint32_t> optGroupId)
 {
 	IDeckLinkIterator* deckLinkIterator = nullptr;
 
@@ -42,6 +69,12 @@ std::vector<std::unique_ptr<Device>> InitializeDevices()
 	while (deckLinkIterator->Next(&deckLink) == S_OK)
 	{
 		auto bmDevice = std::make_unique<SubDevice>(deckLink);
+		if (optGroupId && bmDevice->DeviceGroupId != *optGroupId)
+		{
+			bmDevice.reset();
+			Release(deckLink);
+			continue;
+		}
 		subDevices.push_back(std::move(bmDevice));
 		deviceNumber++;
 	}
@@ -63,33 +96,6 @@ std::vector<std::unique_ptr<Device>> InitializeDevices()
 
 	return devices;
 }
-
-class ProfileChangeCallback : public Object<IDeckLinkProfileCallback>
-{
-public:
-	ProfileChangeCallback(uint32_t deviceIndex, int64_t deviceGroupId) :
-		DeviceIndex(deviceIndex), DeviceGroupId(deviceGroupId)
-	{
-	}
-
-	HRESULT	STDMETHODCALLTYPE ProfileChanging(IDeckLinkProfile* newProfile, dlbool_t streamsWillBeForcedToStop) override
-	{
-		DeviceLock lock(DeviceIndex, false);
-		if (auto device = DeviceManager::Instance()->GetDevice(DeviceIndex))
-			device->ClearSubDevices();
-		return S_OK;
-	}
-	HRESULT	STDMETHODCALLTYPE ProfileActivated(IDeckLinkProfile* newProfile) override
-	{
-		DeviceLock lock(DeviceIndex, false);
-		if (auto device = DeviceManager::Instance()->GetDevice(DeviceIndex))
-			device->Reinit(DeviceGroupId);
-		return S_OK;
-	}
-
-	uint32_t DeviceIndex;
-	int64_t DeviceGroupId;
-};
 
 Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevices)
 	: Index(index), SubDevices(std::move(subDevices)), DeviceInvalidatedCallbacksMutex(new std::mutex)
@@ -144,20 +150,24 @@ Device::Device(uint32_t index, std::vector<std::unique_ptr<SubDevice>>&& subDevi
 
 void Device::Reinit(uint32_t groupId)
 {
-	IDeckLink* dlDevice = nullptr;
-	if (auto mainSubDevice = GetSubDevice(0))
-		dlDevice = mainSubDevice->DLDevice;
-	ClearSubDevices();
-	Release(dlDevice);
-	auto devices = InitializeDevices();
-	for (auto& device : devices)
 	{
-		if (device->GroupId == groupId)
-		{
-			*this = std::move(*device);
-			break;
-		}
+		IDeckLink* dlDevice = nullptr;
+		if (auto mainSubDevice = GetSubDevice(0))
+			dlDevice = mainSubDevice->DLDevice;
+		ClearSubDevices();
+		Release(dlDevice);
 	}
+	auto devices = CreateDevices(groupId);
+	if (devices.empty())
+	{
+		nosEngine.LogE("DeckLinkDevice: Failed to reinitialize device with index: %d", Index);
+		return;
+	}
+	if (devices.size() > 1)
+	{
+		nosEngine.LogE("DeckLinkDevice: Reinitialized device with index: %d, but found more than one device with same group ID!", Index);
+	}
+	*this = std::move(*devices[0]);
 }
 
 std::string Device::GetUniqueDisplayName() const
@@ -434,7 +444,18 @@ void Device::ClearSubDevices()
 {
 	Channel2SubDevice.clear();
 	OpenChannels.clear();
+	std::vector<IDeckLink*> siblings;
+	auto* mainSubDevice = GetSubDevice(0);
+	for (auto& subDevice : SubDevices)
+	{
+		if (mainSubDevice && mainSubDevice->DLDevice == subDevice->DLDevice)
+			// Main sub-device will be released later to avoid deadlock during profile change callback. 
+			continue;
+		siblings.push_back(subDevice->DLDevice);
+	}
 	SubDevices.clear();
+	for (auto sibling : siblings)
+		Release(sibling);
 	{
 		std::unique_lock lock(*DeviceInvalidatedCallbacksMutex);
 		for (auto& [callbackId, pair] : DeviceInvalidatedCallbacks)

@@ -97,7 +97,7 @@ nosResult NOSAPI_CALL GetAvailableChannels(uint32_t deviceIndex, nosMediaIODirec
 	return NOS_RESULT_SUCCESS;
 }
 
-nosDeckLinkChannel NOSAPI_CALL GetChannelByName(const char* channelName)
+nosDeckLinkChannel NOSAPI_CALL GetChannelFromName(const char* channelName)
 {
 	for (int i = 0; i < NOS_DECKLINK_CHANNEL_COUNT; i++)
 	{
@@ -417,6 +417,26 @@ nosResult NOSAPI_CALL UnregisterDeviceInvalidatedCallback(uint32_t deviceIndex, 
 	return NOS_RESULT_SUCCESS;
 }
 
+	nosResult NOSAPI_CALL GetPortMappedChannelName(uint32_t deviceIndex, nosDeckLinkChannel channel, char* outName, size_t maxSize)
+{
+	auto mappedName = DeviceManager::Instance()->GetPortMappedChannelName(deviceIndex, channel);
+	if (!mappedName)
+		return NOS_RESULT_FAILED;
+	size_t len = mappedName->size() + 1;
+	if (maxSize < len)
+	{
+		nosEngine.LogE("Buffer size is not enough for the mapped channel name");
+		return NOS_RESULT_INSUFFICIENT_BUFFER_SIZE;
+	}
+	strncpy(outName, mappedName->c_str(), len);
+	return NOS_RESULT_SUCCESS;
+}
+
+nosDeckLinkChannel NOSAPI_CALL GetChannelFromPortMappedName(uint32_t deviceIndex, const char* portMappedName)
+{
+	return DeviceManager::Instance()->GetChannelFromPortMappedName(deviceIndex, portMappedName);
+}
+
 nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 {
 	auto it = GExportedSubsystemVersions.find(minorVersion);
@@ -429,7 +449,7 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->GetDevices = GetDevices;
 	subsystem->GetAvailableChannels = GetAvailableChannels;
 	subsystem->GetChannelName = GetChannelName;
-	subsystem->GetChannelByName = GetChannelByName;
+	subsystem->GetChannelFromName = GetChannelFromName;
 	subsystem->GetDeviceByUniqueDisplayName = GetDeviceByUniqueDisplayName;
 	subsystem->GetDeviceInfoByIndex = GetDeviceInfoByIndex;
 	subsystem->GetSupportedOutputFrameGeometries = GetSupportedOutputFrameGeometries;
@@ -448,6 +468,8 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 	subsystem->UnregisterFrameResultCallback = UnregisterFrameResultCallback;
 	subsystem->RegisterDeviceInvalidatedCallback = RegisterDeviceInvalidatedCallback;
 	subsystem->UnregisterDeviceInvalidatedCallback = UnregisterDeviceInvalidatedCallback;
+	subsystem->GetPortMappedChannelName = GetPortMappedChannelName;
+	subsystem->GetChannelFromPortMappedName = GetChannelFromPortMappedName;
 	*outSubsystemContext = subsystem;
 	GExportedSubsystemVersions[minorVersion] = subsystem;
 	return NOS_RESULT_SUCCESS;
@@ -455,7 +477,51 @@ nosResult NOSAPI_CALL Export(uint32_t minorVersion, void** outSubsystemContext)
 
 nosResult NOSAPI_CALL Initialize()
 {
-	DeviceManager::Instance();
+	// Get the settings
+	std::filesystem::path relativeSettingsPath = "Config/Settings.json";
+	auto settingsFilePath = std::filesystem::path(nosEngine.Module->RootFolderPath) / relativeSettingsPath;
+	bool settingsLoaded = false;
+	std::string messageString;
+	nosModuleStatusMessage msg {
+		.ModuleId = nosEngine.Module->Id,
+		.UpdateType = NOS_MODULE_STATUS_MESSAGE_UPDATE_TYPE_APPEND,
+		.MessageType = NOS_MODULE_STATUS_MESSAGE_TYPE_WARNING
+	};
+	if (!std::filesystem::exists(settingsFilePath))
+	{
+		messageString = "Settings file at " + settingsFilePath.string() + " not found. Using default settings.";
+	}
+	else
+	{
+		try
+		{
+			settingsFilePath = std::filesystem::canonical(settingsFilePath);
+		}
+		catch (std::exception& e)
+		{
+		}
+		nosBuffer settingsBuffer;
+		auto res = nosEngine.GetAssetAsType(nosEngine.Module->Id, relativeSettingsPath.string().c_str(), NOS_NAME("nos.sys.decklink.Settings"), &settingsBuffer);
+		if (res != NOS_RESULT_SUCCESS)
+		{
+			messageString = "Failed to load settings file at " + settingsFilePath.string() + ". Using default settings.";
+		}
+		else
+		{
+			auto settings = flatbuffers::GetRoot<sys::decklink::Settings>(settingsBuffer.Data);
+			settings->UnPackTo(&DeviceManager::Instance()->Settings);
+			settingsLoaded = true;
+			msg.MessageType = NOS_MODULE_STATUS_MESSAGE_TYPE_INFO;
+			messageString = "Using SDI port mappings from " + settingsFilePath.string();
+		}
+	}
+	msg.Message = messageString.c_str();
+	nosEngine.SendModuleStatusMessageUpdate(&msg);
+	if (!settingsLoaded)
+	{
+		DeviceManager::Instance()->LoadDefaultSettings();
+	}
+	DeviceManager::Instance()->InitializeDeviceList();
 	return NOS_RESULT_SUCCESS;
 }
 

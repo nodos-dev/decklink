@@ -15,10 +15,12 @@
 
 #include "nosDeckLinkSubsystem/nosDeckLinkSubsystem.h"
 
+#include "DeckLink_generated.h"
+
 namespace nos::decklink
 {
 
-std::vector<std::unique_ptr<class Device>> InitializeDevices();
+std::vector<std::unique_ptr<class Device>> CreateDevices(std::optional<uint32_t> optGroupId = std::nullopt);
 
 class Device
 {

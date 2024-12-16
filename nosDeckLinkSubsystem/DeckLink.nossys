@@ -1,23 +1,24 @@
 {
-    "info": {
-        "id": {
-            "name": "nos.sys.decklink",
-            "version": "0.1.0"
-        },
-        "display_name": "DeckLink Subsystem",
-        "description": "A Nodos subsystem for controlling BlackMagic DeckLink devices.",
-        "dependencies": [
+	"info": {
+		"id": {
+			"name": "nos.sys.decklink",
+			"version": "0.2.0"
+		},
+		"display_name": "DeckLink Subsystem",
+		"description": "A Nodos subsystem for controlling BlackMagic DeckLink devices.",
+		"dependencies": [
 			{
 				"name": "nos.sys.mediaio",
 				"version": "0.1.0"
 			}
-        ],
-        "category": "Device"
-    },
-    "binary_path": "Binaries/nosDeckLinkSubsystem",
-    "custom_types": [
-    ],
-    "defaults": [
-    ],
-    "third_party_software": []
+		],
+		"category": "Device"
+	},
+	"binary_path": "Binaries/nosDeckLinkSubsystem",
+	"custom_types": [
+		"Types/DeckLink.fbs"
+	],
+	"defaults": [
+	],
+	"third_party_software": []
 }

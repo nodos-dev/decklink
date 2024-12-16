@@ -48,6 +48,7 @@ struct ChannelHandler
 	bool IsOpen = false;
 	bool IsStreamStarted = false;
 	nosUUID IsOpenPinId;
+	nosUUID ChannelNamePinId;
 	nosUUID OutChannelPinId;
 	nosUUID OutResolutionPinId;
 	nosUUID OutPixelFormatPinId;
@@ -138,7 +139,7 @@ struct ChannelHandler
 
 	void DeviceInvalidated()
 	{
-		nosEngine.SetPinValue(IsOpenPinId, nos::Buffer::From(false));
+		nosEngine.SetPinValue(ChannelNamePinId, nos::Buffer("NONE", 5));
 	}
 
 	bool CanOpen()
@@ -220,7 +221,10 @@ struct ChannelHandler
 
 	void UpdateChannelStatus()
 	{
-		std::string channelString = nosDeckLink->GetChannelName(Channel);
+		std::string channelString(256, '\0');
+		auto res = nosDeckLink->GetPortMappedChannelName(DeviceIndex, Channel, channelString.data(), channelString.size());
+		if (res != NOS_RESULT_SUCCESS)
+			channelString = "Unknown Channel";
 		channelString += " ";
 		if (Resolution != NOS_MEDIAIO_FRAME_GEOMETRY_INVALID)
 		{
@@ -236,7 +240,8 @@ struct ChannelHandler
 			type = fb::NodeStatusMessageType::INFO;
 			statusText = channelString;
 			Node->SetPinOrphanState(OutChannelPinId, fb::PinOrphanStateType::ACTIVE);
-		} else
+		}
+		else
 		{
 			if (ShouldOpen && !IsOpen && CanOpen())
 			{
@@ -328,6 +333,7 @@ public:
 		SetPinVisualizer(NSN_PixelFormat, {.type = nos::fb::VisualizerType::COMBO_BOX, .name = GetPixelFormatStringListName()});
 
 		Channel.IsOpenPinId = *GetPinId(NSN_IsOpen);
+		Channel.ChannelNamePinId = *GetPinId(NSN_ChannelName);
 		Channel.OutChannelPinId = *GetPinId(NSN_ChannelId);
 		Channel.OutResolutionPinId = *GetPinId(NSN_ChannelResolution);
 		Channel.OutPixelFormatPinId = *GetPinId(NSN_ChannelPixelFormat);
@@ -368,7 +374,7 @@ public:
 		});
 		AddPinValueWatcher(NSN_ChannelName, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			ChannelPinValue = InterpretPinValue<const char>(newVal);
-			auto newChannel = nosDeckLink->GetChannelByName(ChannelPinValue.c_str());
+			auto newChannel = nosDeckLink->GetChannelFromPortMappedName(Channel.DeviceIndex, ChannelPinValue.c_str());
 			Channel.Update<&ChannelHandler::Channel>(newChannel);
 			if (ChannelPinValue != "NONE" && newChannel == NOS_DECKLINK_CHANNEL_INVALID)
 				ResetPin(NSN_ChannelName);
@@ -544,7 +550,8 @@ public:
 		nosDeckLink->GetAvailableChannels(Channel.DeviceIndex, Channel.Direction, &channelList);
 		for (size_t i = 0; i < channelList.Count; i++)
 		{
-			auto channelName = nosDeckLink->GetChannelName(channelList.Channels[i]);
+			std::string channelName(256, '\0');
+			nosDeckLink->GetPortMappedChannelName(Channel.DeviceIndex, channelList.Channels[i], channelName.data(), channelName.size());
 			channels.push_back(channelName);
 		}
 		return channels;

@@ -7,6 +7,9 @@
 #include <shared_mutex>
 #include <Nodos/Modules.h>
 
+#include "DeckLink_generated.h"
+#include "nosDeckLinkSubsystem/nosDeckLinkSubsystem.h"
+
 namespace nos::decklink
 {
 class Device;
@@ -23,6 +26,11 @@ public:
 	static DeviceManager* Instance();
 	static void Destroy();
 	~DeviceManager();
+	sys::decklink::TSettings Settings;
+	void LoadDefaultSettings();
+	void InitializeDeviceList();
+	std::optional<std::string> GetPortMappedChannelName(uint32_t deviceIndex, nosDeckLinkChannel channel);
+	nosDeckLinkChannel GetChannelFromPortMappedName(uint32_t deviceIndex, std::string_view portMappedName);
 protected:
 	std::unordered_map<uint32_t, std::unique_ptr<std::shared_mutex>> DeviceMutexes;
 	std::vector<std::unique_ptr<Device>> Devices;

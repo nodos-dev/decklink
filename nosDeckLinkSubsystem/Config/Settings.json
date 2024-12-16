@@ -1,0 +1,25 @@
+{
+    "sdi_port_mappings": [
+        {
+            "model_name": "DeckLink 8K Pro",
+            "sdi_port_mapping": [
+                {
+                    "source_port": 1,
+                    "target_port": 1
+                },
+                {
+                    "source_port": 2,
+                    "target_port": 2
+                },
+                {
+                    "source_port": 3,
+                    "target_port": 3
+                },
+                {
+                    "source_port": 4,
+                    "target_port": 4
+                }
+            ]
+        }
+    ]
+}
