@@ -59,8 +59,8 @@ bool DeviceManager::ValidatePortMappings()
 		std::unordered_set<int> targetPorts, sourcePorts;
 		for (auto& entry : portMapping)
 		{
-			auto src = entry.source_port();
-			auto dst = entry.target_port();
+			auto src = entry.original_port();
+			auto dst = entry.new_port();
 			if (src < 1 || src > portCount || dst < 1 || dst > portCount)
 			{
 				std::snprintf(errorMsg, sizeof(errorMsg), "Invalid port mapping for device %s: %d > %d", modelName.c_str(), src, dst);
@@ -160,8 +160,8 @@ std::optional<std::string> DeviceManager::GetPortMappedChannelName(uint32_t devi
 			continue;
 		for (auto& entry : portMappingSetting->sdi_port_mapping)
 		{
-			std::string sourcePortStr = std::to_string(entry.source_port());
-			std::string targetPortStr = std::to_string(entry.target_port());
+			std::string sourcePortStr = std::to_string(entry.original_port());
+			std::string targetPortStr = std::to_string(entry.new_port());
 			transformations[sourcePortStr] = targetPortStr;
 		}
 	}
@@ -188,8 +188,8 @@ nosDeckLinkChannel DeviceManager::GetChannelFromPortMappedName(uint32_t deviceIn
 			continue;
 		for (auto& entry : portMappingSetting->sdi_port_mapping)
 		{
-			std::string sourcePortStr = std::to_string(entry.source_port());
-			std::string targetPortStr = std::to_string(entry.target_port());
+			std::string sourcePortStr = std::to_string(entry.original_port());
+			std::string targetPortStr = std::to_string(entry.new_port());
 			transformations[targetPortStr] = sourcePortStr; // reverse
 		}
 	}

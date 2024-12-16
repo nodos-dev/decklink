@@ -1,8 +1,8 @@
 namespace nos.sys.decklink;
 
 struct SDIPortMappingEntry {
-    source_port: int;
-    target_port: int;
+    original_port: int;
+    new_port: int;
 }
 
 table SDIPortMappingSetting {
