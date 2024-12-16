@@ -500,7 +500,7 @@ nosResult NOSAPI_CALL Initialize()
 		catch (std::exception& e)
 		{
 		}
-		nosBuffer settingsBuffer;
+		nosBuffer settingsBuffer{};
 		auto res = nosEngine.GetAssetAsType(nosEngine.Module->Id, relativeSettingsPath.string().c_str(), NOS_NAME("nos.sys.decklink.Settings"), &settingsBuffer);
 		if (res != NOS_RESULT_SUCCESS)
 		{
@@ -508,12 +508,12 @@ nosResult NOSAPI_CALL Initialize()
 		}
 		else
 		{
-			auto settings = flatbuffers::GetRoot<sys::decklink::Settings>(settingsBuffer.Data);
-			settings->UnPackTo(&DeviceManager::Instance()->Settings);
+			DeviceManager::Instance()->LoadSettings(*flatbuffers::GetRoot<sys::decklink::Settings>(settingsBuffer.Data));
 			settingsLoaded = true;
 			msg.MessageType = NOS_MODULE_STATUS_MESSAGE_TYPE_INFO;
 			messageString = "Using SDI port mappings from " + settingsFilePath.string();
 		}
+		nosEngine.FreeBuffer(&settingsBuffer);
 	}
 	msg.Message = messageString.c_str();
 	nosEngine.SendModuleStatusMessageUpdate(&msg);
