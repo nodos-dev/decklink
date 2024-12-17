@@ -116,8 +116,8 @@ typedef struct nosDeckLinkSubsystem {
 	///  - If SDI 1 is mapped to SDI 3:
 	///		- "Single Link 1" -> "Single Link 3"
 	///		- "Dual Link 1-2" -> "Dual Link 1-3"
-	nosResult		   (NOSAPI_CALL* GetPortMappedChannelName)(uint32_t deviceIndex, nosDeckLinkChannel channel, char* outName, size_t maxSize);
-	nosDeckLinkChannel (NOSAPI_CALL* GetChannelFromPortMappedName)(uint32_t deviceIndex, const char* portMappedChannelName);
+	nosResult			(NOSAPI_CALL* GetPortMappedChannelName)(uint32_t deviceIndex, nosDeckLinkChannel channel, char* outName, size_t maxSize);
+	nosDeckLinkChannel	(NOSAPI_CALL* GetChannelFromPortMappedName)(uint32_t deviceIndex, const char* portMappedChannelName);
 } nosDeckLinkSubsystem;
 
 #pragma region Helper Declarations & Macros

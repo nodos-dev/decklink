@@ -156,7 +156,12 @@ bool OutputHandler::Close()
 	}
 	{
 		std::unique_lock lock(PlaybackStoppedMutex);
-		PlaybackStoppedCond.wait(lock, [this]{ return Closed; });
+		PlaybackStoppedCond.wait_for(lock, std::chrono::milliseconds(100), [this]{ return Closed; });
+		if (!Closed)
+		{
+			nosEngine.LogE("SubDevice: Timeout waiting for playback to stop");
+			NOS_SOFT_CHECK(false)
+		}
 	}
 	Interface->SetScheduledFrameCompletionCallback(nullptr);
 	return true;
