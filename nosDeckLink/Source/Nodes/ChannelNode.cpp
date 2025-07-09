@@ -528,7 +528,7 @@ public:
 		AddPinValueWatcher(NSN_PixelFormat, [this](const nos::Buffer& newVal, std::optional<nos::Buffer> oldValue) {
 			PixelFormatPinValue = InterpretPinValue<const char>(newVal);
 			auto newPixelFormat = nosMediaIO->GetPixelFormatFromString(PixelFormatPinValue.c_str());
-			Channel.Update<&ChannelHandler::PixelFormat>(newPixelFormat, !Channel.IsInput());
+			Channel.Update<&ChannelHandler::PixelFormat>(newPixelFormat);
 			if (PixelFormatPinValue != PIN_VALUE_NONE && newPixelFormat == NOS_MEDIAIO_PIXEL_FORMAT_INVALID)
 				ResetPin(NSN_FrameRate);
 			else
@@ -582,7 +582,7 @@ public:
 			ChangePinReadOnly(NSN_VideoScanType, isInput);
 			ChangePinReadOnly(NSN_Resolution, isInput);
 			ChangePinReadOnly(NSN_FrameRate, isInput);
-			ChangePinReadOnly(NSN_PixelFormat, isInput);
+			ChangePinReadOnly(NSN_PixelFormat, false);
 			auto deviceList = GetPossibleDevices();
 			if (!first)
 				AutoSelectIfSingle(GetPinName(GetNextEntry(pin)), deviceList);
@@ -916,7 +916,7 @@ bool ChannelHandler::Open()
 		nosDeckLinkOpenChannelParams params {
 			.Direction = Direction,
 			.Channel = Channel,
-			.PixelFormat = IsInput() ? NOS_MEDIAIO_PIXEL_FORMAT_YCBCR_8BIT : PixelFormat,
+			.PixelFormat = IsInput() && PixelFormat == NOS_MEDIAIO_PIXEL_FORMAT_INVALID ? NOS_MEDIAIO_PIXEL_FORMAT_YCBCR_8BIT : PixelFormat,
 			.Output = {}
 		};
 		if (!IsInput())

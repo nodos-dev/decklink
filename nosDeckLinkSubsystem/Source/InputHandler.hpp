@@ -36,6 +36,8 @@ protected:
 	bool Start() override;
 	bool Stop() override;
 	bool Close() override;
+
+	BMDPixelFormat PixelFormat = bmdFormat8BitYUV;
 };
 
 }
