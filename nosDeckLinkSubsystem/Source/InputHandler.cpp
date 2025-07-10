@@ -164,6 +164,7 @@ bool InputHandler::Open(BMDDisplayMode displayMode, BMDPixelFormat pixelFormat)
 	}
 	Release(callback);
 	PixelFormat = pixelFormat;
+	DisplayMode = bmdModeUnknown;
 	res = Interface->EnableVideoInput(displayMode, PixelFormat, bmdVideoInputEnableFormatDetection);
 	if (res != S_OK)
 	{
@@ -271,13 +272,15 @@ bool InputHandler::UpdateFrameRate(BMDDisplayMode displayMode)
 
 void InputHandler::OnInputVideoFormatChanged_DeckLinkThread(BMDDisplayMode newDisplayMode, BMDPixelFormat detectedPixelFormat)
 {
+	if (DisplayMode == newDisplayMode)
+		return;
 	IsInterlaced = GetVideoScanType(newDisplayMode) == NOS_MEDIAIO_VIDEO_INTERLACED_SCAN;
 
 	// Pause video capture
 	Interface->PauseStreams();
-	
+
 	// Enable video input with the properties of the new video stream
-	Interface->EnableVideoInput(newDisplayMode, PixelFormat, bmdVideoInputFlagDefault);
+	Interface->EnableVideoInput(newDisplayMode, PixelFormat, bmdVideoInputEnableFormatDetection);
 
 	UpdateFrameRate(newDisplayMode);
 
@@ -296,6 +299,7 @@ void InputHandler::OnInputVideoFormatChanged_DeckLinkThread(BMDDisplayMode newDi
 			callback(userData, GetVideoScanType(newDisplayMode), frameGeometry, frameRate, GetPixelFormatFromDeckLink(PixelFormat));
 		}
 	}
+	DisplayMode = newDisplayMode;
 }
 
 int32_t InputHandler::AddInputVideoFormatChangeCallback(nosDeckLinkInputVideoFormatChangeCallback callback, void* userData)

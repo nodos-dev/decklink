@@ -38,6 +38,7 @@ protected:
 	bool Close() override;
 
 	BMDPixelFormat PixelFormat = bmdFormat8BitYUV;
+	BMDDisplayMode DisplayMode = bmdModeUnknown;
 };
 
 }

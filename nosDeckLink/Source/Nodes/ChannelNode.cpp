@@ -134,6 +134,7 @@ struct ChannelHandler
 		nosEngine.SetPinValue(VideoScanTypePinId, nos::Buffer(scanTypeCstr, strlen(scanTypeCstr) + 1));
 		nosEngine.SetPinValue(PixelFormatPinId, nos::Buffer(pixelFormatCstr, strlen(pixelFormatCstr) + 1));
 		UpdateChannelStatus();
+		UpdateOutPins();
 	}
 
 	void OnFrameEnd(nosDeckLinkFrameResult result, uint32_t processedFrameNumber)
