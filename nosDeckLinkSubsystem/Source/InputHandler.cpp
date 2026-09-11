@@ -84,7 +84,9 @@ public:
 
 	HRESULT STDMETHODCALLTYPE VideoInputFrameArrived (/* in */ IDeckLinkVideoInputFrame* videoFrame, /* in */ IDeckLinkAudioInputPacket* audioPacket)
 	{
-		Input->OnInputFrameArrived_DeckLinkThread(videoFrame);
+		// DeckLink can deliver audio packets without a video frame.
+		if (videoFrame)
+			Input->OnInputFrameArrived_DeckLinkThread(videoFrame);
 		if (audioPacket)
 			Input->OnInputAudioArrived_DeckLinkThread(audioPacket);
 		return S_OK;
